@@ -9,6 +9,9 @@ import {
   analyzeCandidateResumeMock,
   createCandidateMock,
   createJobDescription,
+  deleteCandidateById,
+  deleteJobDescriptionById,
+  updateJobDescriptionOpeningsById,
 } from "@/lib/mock-api";
 
 /**
@@ -59,6 +62,48 @@ export async function createJobDescriptionAction(payload) {
   const result = await createJobDescription(payload);
   if (result.data) {
     revalidatePath("/admin/job-descriptions");
+    revalidatePath("/admin");
+  }
+  return result;
+}
+
+/**
+ * Server action: update job description openings.
+ * @param {{ job_description_id: string | number; openings: number }} params - RORO style
+ * @returns {Promise<{ ok: boolean; data?: object; error_message?: string }>}
+ */
+export async function updateJobDescriptionOpeningsAction({ job_description_id, openings }) {
+  const result = await updateJobDescriptionOpeningsById({ job_description_id, openings });
+  if (result.ok) {
+    revalidatePath("/admin/job-descriptions");
+    revalidatePath("/admin");
+  }
+  return result;
+}
+
+/**
+ * Server action: delete job description.
+ * @param {{ job_description_id: string | number }} params - RORO style
+ * @returns {Promise<{ ok: boolean; deleted_id?: string; error_message?: string }>}
+ */
+export async function deleteJobDescriptionAction({ job_description_id }) {
+  const result = await deleteJobDescriptionById({ job_description_id });
+  if (result.ok) {
+    revalidatePath("/admin/job-descriptions");
+    revalidatePath("/admin");
+  }
+  return result;
+}
+
+/**
+ * Server action: delete candidate.
+ * @param {{ candidate_id: string | number }} params - RORO style
+ * @returns {Promise<{ ok: boolean; deleted_id?: string; error_message?: string }>}
+ */
+export async function deleteCandidateAction({ candidate_id }) {
+  const result = await deleteCandidateById({ candidate_id });
+  if (result.ok) {
+    revalidatePath("/admin/candidates");
     revalidatePath("/admin");
   }
   return result;
