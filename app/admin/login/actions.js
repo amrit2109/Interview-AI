@@ -3,10 +3,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { loginAdmin } from "@/lib/mock-api";
-import { ADMIN_SESSION_COOKIE } from "@/lib/auth";
+import { ADMIN_SESSION_COOKIE, signToken } from "@/lib/auth";
 
 /**
- * Server action: validate credentials, set session cookie, redirect to dashboard.
+ * Server action: validate credentials, set signed session cookie, redirect to dashboard.
  * @param {FormData} formData
  */
 export async function handleLogin(formData) {
@@ -23,8 +23,9 @@ export async function handleLogin(formData) {
     return { error };
   }
 
+  const token = await signToken({ sub: String(data.id) });
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_SESSION_COOKIE, JSON.stringify(data), {
+  cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

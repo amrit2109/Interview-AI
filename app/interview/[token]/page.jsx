@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 import { Suspense } from "react";
 import { InterviewEntryCard } from "@/components/interview/InterviewEntryCard";
 import { Button } from "@/components/ui/button";

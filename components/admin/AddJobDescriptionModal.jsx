@@ -18,7 +18,7 @@ import {
   FieldError,
 } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
-import { createJobDescription } from "@/lib/mock-api";
+import { createJobDescriptionAction } from "@/app/admin/actions";
 
 /**
  * Add Job Description modal.
@@ -29,6 +29,7 @@ import { createJobDescription } from "@/lib/mock-api";
  */
 export function AddJobDescriptionModal({ open, onOpenChange, onSuccess }) {
   const [jobName, setJobName] = useState("");
+  const [openings, setOpenings] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,7 +52,7 @@ export function AddJobDescriptionModal({ open, onOpenChange, onSuccess }) {
 
     setIsSubmitting(true);
     try {
-      const { data, error: apiError } = await createJobDescription({
+      const { data, error: apiError } = await createJobDescriptionAction({
         jobName: trimmedJobName,
         description: trimmedDescription,
       });
@@ -60,6 +61,7 @@ export function AddJobDescriptionModal({ open, onOpenChange, onSuccess }) {
         return;
       }
       setJobName("");
+      setOpenings("");
       setDescription("");
       onOpenChange(false);
       onSuccess?.(data);
@@ -71,6 +73,7 @@ export function AddJobDescriptionModal({ open, onOpenChange, onSuccess }) {
   const handleOpenChange = (next) => {
     if (!next) {
       setJobName("");
+      setOpenings("");
       setDescription("");
       setError(null);
     }
@@ -97,6 +100,22 @@ export function AddJobDescriptionModal({ open, onOpenChange, onSuccess }) {
                 value={jobName}
                 onChange={(e) => setJobName(e.target.value)}
                 placeholder="e.g. Frontend Developer"
+                disabled={isSubmitting}
+                aria-invalid={!!error}
+                aria-describedby={error ? "jd-form-error" : undefined}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>
+                <Label htmlFor="jd-openings">Number of openings</Label>
+              </FieldLabel>
+              <Input
+                id="jd-openings"
+                type="number"
+                min={1}
+                value={openings}
+                onChange={(e) => setOpenings(e.target.value)}
+                placeholder="e.g. 3"
                 disabled={isSubmitting}
                 aria-invalid={!!error}
                 aria-describedby={error ? "jd-form-error" : undefined}

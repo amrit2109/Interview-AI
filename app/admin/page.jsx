@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -29,8 +31,8 @@ async function AdminDashboardPage() {
   const totalLinkSent = candidates.filter((c) => c.token != null).length;
 
   const recentCandidates = [...candidates].sort((a, b) => {
-    const da = a.interviewDate || "";
-    const db = b.interviewDate || "";
+    const da = a.interviewDate != null ? String(a.interviewDate) : "";
+    const db = b.interviewDate != null ? String(b.interviewDate) : "";
     return db.localeCompare(da);
   });
 

@@ -1,4 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const dynamic = "force-dynamic";
 import { Badge } from "@/components/ui/badge";
 import { getCandidates } from "@/lib/mock-api";
 import { CandidateRowActions } from "@/components/admin/CandidateRowActions";
@@ -35,9 +37,10 @@ async function CandidatesListContent() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-3 text-left font-medium">Name</th>
+                    <th className="px-4 py-3 text-left font-medium">Email</th>
+                    <th className="px-4 py-3 text-left font-medium">Phone</th>
                     <th className="px-4 py-3 text-left font-medium">Position</th>
                     <th className="px-4 py-3 text-left font-medium">ATS</th>
-                    <th className="px-4 py-3 text-left font-medium">Interview</th>
                     <th className="px-4 py-3 text-left font-medium">Status</th>
                     <th className="px-4 py-3 text-right font-medium">Actions</th>
                   </tr>
@@ -45,15 +48,11 @@ async function CandidatesListContent() {
                 <tbody>
                   {candidates.map((c) => (
                     <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium">{c.name}</p>
-                          <p className="text-xs text-muted-foreground">{c.email}</p>
-                        </div>
-                      </td>
+                      <td className="px-4 py-3 font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{c.email}</td>
+                      <td className="px-4 py-3">{c.phone ?? "—"}</td>
                       <td className="px-4 py-3">{c.position}</td>
                       <td className="px-4 py-3">{c.atsScore ?? "—"}</td>
-                      <td className="px-4 py-3">{c.interviewScore ?? "—"}</td>
                       <td className="px-4 py-3">
                         <Badge variant={STATUS_VARIANTS[c.status] ?? "outline"}>
                           {formatStatus(c.status)}
@@ -87,9 +86,9 @@ async function CandidatesListContent() {
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-sm">{c.position}</p>
-              <div className="flex gap-4 text-xs text-muted-foreground">
+              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <span>Phone: {c.phone ?? "—"}</span>
                 <span>ATS: {c.atsScore ?? "—"}</span>
-                <span>Interview: {c.interviewScore ?? "—"}</span>
               </div>
               <CandidateRowActions id={c.id} name={c.name} />
             </CardContent>

@@ -1,9 +1,12 @@
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getCandidateById } from "@/lib/mock-api";
+import { format } from "@/lib/date-utils";
 import { ArrowLeftIcon, FileTextIcon } from "lucide-react";
 
 const STATUS_VARIANTS = {
@@ -62,7 +65,7 @@ async function CandidateDetailContent({ id }) {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Interview Date</p>
-              <p className="mt-1">{candidate.interviewDate ?? "—"}</p>
+              <p className="mt-1">{format(candidate.interviewDate)}</p>
             </div>
           </div>
           {candidate.status === "completed" && (

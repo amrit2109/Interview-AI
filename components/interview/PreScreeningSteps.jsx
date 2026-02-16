@@ -19,7 +19,7 @@ import {
   FieldError,
 } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { submitPreScreen } from "@/lib/mock-api";
+import { submitPreScreenAction } from "@/app/interview/actions";
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
 import {
   ArrowLeftIcon,
@@ -183,7 +183,7 @@ export function PreScreeningSteps({ interview, token }) {
     setIsSubmitting(true);
     setErrors({});
     try {
-      const { error } = await submitPreScreen(token, formData);
+      const { error } = await submitPreScreenAction(token, formData);
       if (error) {
         setErrors({ submit: error });
         return;
