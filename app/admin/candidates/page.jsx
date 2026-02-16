@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getCandidates } from "@/lib/mock-api";
-import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CandidateRowActions } from "@/components/admin/CandidateRowActions";
 
 const STATUS_VARIANTS = {
   completed: "default",
@@ -62,12 +60,7 @@ async function CandidatesListContent() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href={`/admin/candidates/${c.id}`}>
-                            View
-                            <ChevronRightIcon className="ml-1 size-4" />
-                          </Link>
-                        </Button>
+                        <CandidateRowActions id={c.id} name={c.name} />
                       </td>
                     </tr>
                   ))}
@@ -98,12 +91,7 @@ async function CandidatesListContent() {
                 <span>ATS: {c.atsScore ?? "—"}</span>
                 <span>Interview: {c.interviewScore ?? "—"}</span>
               </div>
-              <Button asChild variant="outline" size="sm" className="w-full">
-                <Link href={`/admin/candidates/${c.id}`}>
-                  View details
-                  <ChevronRightIcon className="ml-1 size-4" />
-                </Link>
-              </Button>
+              <CandidateRowActions id={c.id} name={c.name} />
             </CardContent>
           </Card>
         ))}

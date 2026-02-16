@@ -5,46 +5,28 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { SectionHeader } from "@/components/dashboard/SectionHeader";
 import { RecentCandidatesList } from "@/components/dashboard/RecentCandidatesList";
 import { UpcomingInterviewsList } from "@/components/dashboard/UpcomingInterviewsList";
-import { getCandidates } from "@/lib/mock-api";
+import { getCandidates, getJobDescriptions } from "@/lib/mock-api";
 import {
   UsersIcon,
-  CheckCircleIcon,
-  TrendingUpIcon,
-  BarChart3Icon,
+  FileTextIcon,
+  VideoIcon,
+  LinkIcon,
   ArrowRightIcon,
 } from "lucide-react";
 import { JobDescriptionManager } from "@/components/admin/JobDescriptionManager";
 
 async function AdminDashboardPage() {
-  const { data: candidates } = await getCandidates();
+  const [{ data: candidates }, { data: jobDescriptions }] = await Promise.all([
+    getCandidates(),
+    getJobDescriptions(),
+  ]);
 
-  const completed = candidates.filter((c) => c.status === "completed").length;
-  const total = candidates.length;
-
-  const completionRate =
-    total > 0 ? Math.round((completed / total) * 100) : 0;
-
-  const completedWithAts = candidates.filter(
-    (c) => typeof c.atsScore === "number"
-  );
-  const avgAtsScore =
-    completedWithAts.length > 0
-      ? Math.round(
-          completedWithAts.reduce((s, c) => s + c.atsScore, 0) /
-            completedWithAts.length
-        )
-      : 0;
-
-  const completedWithInterview = candidates.filter(
-    (c) => typeof c.interviewScore === "number"
-  );
-  const avgInterviewScore =
-    completedWithInterview.length > 0
-      ? Math.round(
-          completedWithInterview.reduce((s, c) => s + c.interviewScore, 0) /
-            completedWithInterview.length
-        )
-      : 0;
+  const totalCandidates = candidates.length;
+  const totalJDs = jobDescriptions.length;
+  const totalInterviewsTaken = candidates.filter(
+    (c) => c.status === "completed"
+  ).length;
+  const totalLinkSent = candidates.filter((c) => c.token != null).length;
 
   const recentCandidates = [...candidates].sort((a, b) => {
     const da = a.interviewDate || "";
@@ -54,6 +36,35 @@ async function AdminDashboardPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
+      <section className="mb-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Total Candidates"
+            value={totalCandidates}
+            Icon={UsersIcon}
+            subtext="All applicants in pipeline"
+          />
+          <StatCard
+            label="Total JDs"
+            value={totalJDs}
+            Icon={FileTextIcon}
+            subtext="Job descriptions"
+          />
+          <StatCard
+            label="Total Interviews Taken"
+            value={totalInterviewsTaken}
+            Icon={VideoIcon}
+            subtext="Completed interviews"
+          />
+          <StatCard
+            label="Total Link Sent"
+            value={totalLinkSent}
+            Icon={LinkIcon}
+            subtext="Interview links sent"
+          />
+        </div>
+      </section>
+
       <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">Admin Dashboard</h1>
@@ -63,35 +74,6 @@ async function AdminDashboardPage() {
         </div>
         <JobDescriptionManager />
       </div>
-
-      <section className="mb-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Total Candidates"
-            value={total}
-            Icon={UsersIcon}
-            subtext="All applicants in pipeline"
-          />
-          <StatCard
-            label="Completion Rate"
-            value={`${completionRate}%`}
-            Icon={CheckCircleIcon}
-            subtext="Completed interviews"
-          />
-          <StatCard
-            label="Avg ATS Score"
-            value={avgAtsScore}
-            Icon={BarChart3Icon}
-            subtext="Across all candidates"
-          />
-          <StatCard
-            label="Avg Interview Score"
-            value={avgInterviewScore}
-            Icon={TrendingUpIcon}
-            subtext="Completed interviews only"
-          />
-        </div>
-      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
