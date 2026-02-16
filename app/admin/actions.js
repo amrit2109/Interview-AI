@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth";
 import {
   getJobDescriptions,
@@ -55,5 +56,10 @@ export async function createCandidateMockAction(payload) {
  * @returns {Promise<{ data: object | null; error: string | null }>}
  */
 export async function createJobDescriptionAction(payload) {
-  return createJobDescription(payload);
+  const result = await createJobDescription(payload);
+  if (result.data) {
+    revalidatePath("/admin/job-descriptions");
+    revalidatePath("/admin");
+  }
+  return result;
 }

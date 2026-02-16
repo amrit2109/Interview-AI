@@ -50,11 +50,18 @@ export function AddJobDescriptionModal({ open, onOpenChange, onSuccess }) {
       return;
     }
 
+    const parsedOpenings = openings === "" ? 1 : parseInt(openings, 10);
+    if (!Number.isInteger(parsedOpenings) || parsedOpenings < 1) {
+      setError("Number of openings must be at least 1.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { data, error: apiError } = await createJobDescriptionAction({
         jobName: trimmedJobName,
         description: trimmedDescription,
+        openings: parsedOpenings,
       });
       if (apiError) {
         setError(apiError);
