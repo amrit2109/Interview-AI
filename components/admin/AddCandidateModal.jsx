@@ -24,10 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  analyzeCandidateResumeMock,
-  createCandidateMock,
-  getJobDescriptions,
-} from "@/lib/mock-api";
+  getJobDescriptionsAction,
+  analyzeCandidateResumeMockAction,
+  createCandidateMockAction,
+} from "@/app/admin/actions";
 import { UploadIcon, FileTextIcon, BarChart3Icon, BriefcaseIcon } from "lucide-react";
 
 /**
@@ -51,7 +51,7 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
   const [position, setPosition] = useState("");
 
   const loadJobDescriptions = useCallback(async () => {
-    const { data } = await getJobDescriptions();
+    const { data } = await getJobDescriptionsAction();
     setJobDescriptions(data ?? []);
   }, []);
 
@@ -118,7 +118,9 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
     setError(null);
     setIsAnalyzing(true);
     try {
-      const { data, error: apiError } = await analyzeCandidateResumeMock(file);
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data, error: apiError } = await analyzeCandidateResumeMockAction(formData);
       if (apiError) {
         setError(apiError);
         return;
@@ -151,7 +153,7 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
     }
     setIsSubmitting(true);
     try {
-      const { data, error: apiError } = await createCandidateMock({
+      const { data, error: apiError } = await createCandidateMockAction({
         name: trimmedName,
         email: trimmedEmail,
         phone: phone?.trim() || undefined,

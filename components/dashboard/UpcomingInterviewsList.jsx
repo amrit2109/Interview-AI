@@ -1,16 +1,28 @@
 import Link from "next/link";
 import { format } from "@/lib/date-utils";
 
+function toSortableDate(value) {
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return new Date(value).toISOString();
+  return "";
+}
+
 /**
  * Compact list of upcoming interviews for dashboard.
  * @param {object} props
- * @param {Array<{ id: string; name: string; position: string; interviewDate: string | null; status: string }>} props.candidates
+ * @param {Array<{ id: string; name: string; position: string; interviewDate: string | Date | number | null; status: string }>} props.candidates
  * @param {number} [props.limit]
  */
 export function UpcomingInterviewsList({ candidates, limit = 4 }) {
   const upcoming = candidates
     .filter((c) => c.status !== "completed" && c.interviewDate)
-    .sort((a, b) => (a.interviewDate || "").localeCompare(b.interviewDate || ""))
+    .sort((a, b) =>
+      toSortableDate(a.interviewDate).localeCompare(
+        toSortableDate(b.interviewDate)
+      )
+    )
     .slice(0, limit);
 
   if (upcoming.length === 0) {

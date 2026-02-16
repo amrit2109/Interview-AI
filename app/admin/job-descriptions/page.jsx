@@ -1,11 +1,15 @@
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getJobDescriptions } from "@/lib/mock-api";
 import { ArrowLeftIcon } from "lucide-react";
 
 async function JobDescriptionsListContent() {
-  const { data: jobDescriptions } = await getJobDescriptions();
+  const { data: jobDescriptions, error: fetchError } = await getJobDescriptions();
+  const list = Array.isArray(jobDescriptions) ? jobDescriptions : [];
+  const isEmpty = list.length === 0;
 
   return (
     <div className="space-y-6">
@@ -17,6 +21,15 @@ async function JobDescriptionsListContent() {
           </p>
         </div>
       </div>
+
+      {fetchError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {fetchError}
+        </div>
+      )}
 
       <div className="hidden md:block">
         <Card size="sm">
@@ -31,7 +44,14 @@ async function JobDescriptionsListContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {jobDescriptions.map((jd) => (
+                  {isEmpty && !fetchError && (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                        No job descriptions yet. Add one from the dashboard.
+                      </td>
+                    </tr>
+                  )}
+                  {list.map((jd) => (
                     <tr
                       key={jd.id}
                       className="border-b last:border-0 hover:bg-muted/30"
@@ -55,7 +75,12 @@ async function JobDescriptionsListContent() {
       </div>
 
       <div className="space-y-4 md:hidden">
-        {jobDescriptions.map((jd) => (
+        {isEmpty && !fetchError && (
+          <p className="py-8 text-center text-muted-foreground">
+            No job descriptions yet. Add one from the dashboard.
+          </p>
+        )}
+        {list.map((jd) => (
           <Card key={jd.id} size="sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">{jd.jobName}</CardTitle>
