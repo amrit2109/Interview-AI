@@ -51,11 +51,21 @@ CREATE TABLE IF NOT EXISTS candidates (
   interview_score INTEGER,
   status TEXT NOT NULL DEFAULT 'pending',
   interview_date DATE,
-  token TEXT REFERENCES interviews(token)
+  token TEXT,
+  token_created_at TIMESTAMPTZ,
+  token_expires_at TIMESTAMPTZ,
+  skills TEXT,
+  experience_years INTEGER,
+  education TEXT,
+  ats_explanation TEXT,
+  matched_role_id TEXT REFERENCES job_descriptions(id),
+  match_percentage INTEGER,
+  match_reasoning TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_candidates_token ON candidates(token);
 CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidates(status);
+CREATE INDEX IF NOT EXISTS idx_candidates_token_expires_at ON candidates(token_expires_at);
 
 -- Reports (1:1 with candidates, created after interview)
 CREATE TABLE IF NOT EXISTS reports (
@@ -69,10 +79,10 @@ CREATE TABLE IF NOT EXISTS reports (
   UNIQUE(candidate_id)
 );
 
--- Pre-screening responses (per interview token)
+-- Pre-screening responses (per candidate interview token)
 CREATE TABLE IF NOT EXISTS pre_screens (
   id SERIAL PRIMARY KEY,
-  token TEXT NOT NULL REFERENCES interviews(token),
+  token TEXT NOT NULL,
   experience_years TEXT,
   current_ctc TEXT,
   expected_ctc TEXT,

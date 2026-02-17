@@ -5,6 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getJobDescriptions } from "@/lib/mock-api";
 import { ArrowLeftIcon } from "lucide-react";
+import {
+  JobDescriptionRowActions,
+  OpeningsStepper,
+} from "@/components/admin/JobDescriptionRowActions";
 
 async function JobDescriptionsListContent() {
   const { data: jobDescriptions, error: fetchError } = await getJobDescriptions();
@@ -41,12 +45,13 @@ async function JobDescriptionsListContent() {
                     <th className="px-4 py-3 text-left font-medium">Role</th>
                     <th className="px-4 py-3 text-left font-medium">Description</th>
                     <th className="px-4 py-3 text-left font-medium">Openings</th>
+                    <th className="px-4 py-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isEmpty && !fetchError && (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                         No job descriptions yet. Add one from the dashboard.
                       </td>
                     </tr>
@@ -64,7 +69,12 @@ async function JobDescriptionsListContent() {
                           {jd.description}
                         </p>
                       </td>
-                      <td className="px-4 py-3">{jd.openings}</td>
+                      <td className="px-4 py-3">
+                        <OpeningsStepper id={jd.id} openings={jd.openings} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <JobDescriptionRowActions id={jd.id} jobName={jd.jobName} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -89,9 +99,10 @@ async function JobDescriptionsListContent() {
               <p className="line-clamp-2 text-sm text-muted-foreground">
                 {jd.description}
               </p>
-              <span className="text-sm font-medium">
-                {jd.openings} opening{jd.openings !== 1 ? "s" : ""}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Openings:</span>
+                <OpeningsStepper id={jd.id} openings={jd.openings} />
+              </div>
             </CardContent>
           </Card>
         ))}

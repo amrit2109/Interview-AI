@@ -4,11 +4,11 @@ export const dynamic = "force-dynamic";
 import { Suspense } from "react";
 import { InterviewEntryCard } from "@/components/interview/InterviewEntryCard";
 import { Button } from "@/components/ui/button";
-import { getInterviewByToken } from "@/lib/mock-api";
+import { getInterviewDisplayByToken } from "@/lib/services/interview-token-guard";
 import { AlertCircleIcon } from "lucide-react";
 
 async function InterviewEntryContent({ token }) {
-  const { data, error } = await getInterviewByToken(token);
+  const { data, error, expired } = await getInterviewDisplayByToken(token);
 
   if (error) {
     return (
@@ -17,7 +17,9 @@ async function InterviewEntryContent({ token }) {
           <div className="flex justify-center">
             <AlertCircleIcon className="size-12 text-destructive" aria-hidden />
           </div>
-          <h1 className="text-xl font-semibold">Invalid or Expired Link</h1>
+          <h1 className="text-xl font-semibold">
+            {expired ? "Link Expired" : "Invalid or Expired Link"}
+          </h1>
           <p className="text-muted-foreground">{error}</p>
           <Button asChild variant="outline">
             <Link href="/">Return home</Link>

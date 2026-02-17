@@ -4,11 +4,11 @@ export const dynamic = "force-dynamic";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getInterviewByToken } from "@/lib/mock-api";
+import { getInterviewDisplayByToken } from "@/lib/services/interview-token-guard";
 import { CheckCircleIcon } from "lucide-react";
 
 async function InterviewCompleteContent({ token }) {
-  const { data: interview, error } = await getInterviewByToken(token);
+  const { data: interview, error } = await getInterviewDisplayByToken(token);
 
   if (error || !interview) {
     return (
