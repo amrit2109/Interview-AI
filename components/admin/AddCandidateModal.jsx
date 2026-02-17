@@ -25,13 +25,12 @@ import {
 } from "@/components/ui/select";
 import {
   getJobDescriptionsAction,
-  analyzeCandidateResumeMockAction,
   createCandidateMockAction,
 } from "@/app/admin/actions";
 import { UploadIcon, FileTextIcon, BarChart3Icon, BriefcaseIcon } from "lucide-react";
 
 /**
- * Add Candidate modal with resume upload, AI review (mock), prefilled fields,
+ * Add Candidate modal with resume upload, AI-powered parsing, prefilled fields,
  * ATS score out of 10, and best role recommendation.
  */
 export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
@@ -120,19 +119,31 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const { data, error: apiError } = await analyzeCandidateResumeMockAction(formData);
-      if (apiError) {
-        setError(apiError);
+      const res = await fetch("/api/candidates/analyze-resume", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        let errMsg = json?.error ?? "Resume analysis failed.";
+        if (typeof errMsg === "object") errMsg = JSON.stringify(errMsg);
+        if (typeof errMsg === "string" && (errMsg.length > 300 || errMsg.includes('"code":'))) {
+          errMsg = "Resume analysis failed. Please try again later.";
+        }
+        setError(errMsg);
         return;
       }
-      setParsed(data);
-      setName(data.name ?? "");
-      setEmail(data.email ?? "");
-      setPhone(data.phone ?? "");
-      setExperience(data.experience ?? "");
-      setSkills(data.skills ?? "");
-      setEducation(data.education ?? "");
-      setPosition(data.bestRole?.jobName ?? "");
+      setParsed(json);
+      const c = json.candidate ?? {};
+      const expYears = c.experienceYears;
+      const expStr = expYears != null ? `${expYears} years` : (c.experienceSummary ?? "");
+      setName((c.fullName ?? "").trim());
+      setEmail((c.email ?? "").trim().toLowerCase());
+      setPhone((c.phone ?? "").trim());
+      setExperience(expStr.trim());
+      setSkills(Array.isArray(c.skills) ? c.skills.join(", ") : "");
+      setEducation(Array.isArray(c.education) ? c.education.join(", ") : "");
+      setPosition((json.match?.roleName ?? "").trim());
     } finally {
       setIsAnalyzing(false);
     }
@@ -153,12 +164,20 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
     }
     setIsSubmitting(true);
     try {
+      const matchedJd = jobDescriptions.find((jd) => jd.jobName === position);
       const { data, error: apiError } = await createCandidateMockAction({
         name: trimmedName,
         email: trimmedEmail,
         phone: phone?.trim() || undefined,
         position: position || undefined,
-        atsScore: parsed?.atsScore,
+        atsScore: parsed?.ats?.score ?? parsed?.atsScore,
+        skills: skills?.trim() || undefined,
+        experienceYears: parsed?.candidate?.experienceYears ?? undefined,
+        education: education?.trim() || undefined,
+        atsExplanation: parsed?.ats?.explanation || undefined,
+        matchedRoleId: matchedJd?.id ?? parsed?.match?.roleId ?? undefined,
+        matchPercentage: parsed?.match?.percentage ?? undefined,
+        matchReasoning: parsed?.match?.reasoning || undefined,
       });
       if (apiError) {
         setError(apiError);
@@ -353,8 +372,13 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
                     ATS Score
                   </div>
                   <p className="text-2xl font-bold">
-                    {parsed?.atsScore ?? "—"}/10
+                    {parsed?.ats?.score ?? parsed?.atsScore ?? "—"}/10
                   </p>
+                  {parsed?.ats?.explanation && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {parsed.ats.explanation}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/30 px-4 py-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -362,8 +386,18 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
                     Best Match
                   </div>
                   <p className="text-base font-medium">
-                    {parsed?.bestRole?.jobName ?? "—"}
+                    {parsed?.match?.roleName ?? parsed?.bestRole?.jobName ?? "—"}
+                    {parsed?.match?.percentage != null && (
+                      <span className="text-muted-foreground font-normal ml-1">
+                        ({parsed.match.percentage}%)
+                      </span>
+                    )}
                   </p>
+                  {parsed?.match?.reasoning && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {parsed.match.reasoning}
+                    </p>
+                  )}
                 </div>
               </div>
 

@@ -51,7 +51,14 @@ CREATE TABLE IF NOT EXISTS candidates (
   interview_score INTEGER,
   status TEXT NOT NULL DEFAULT 'pending',
   interview_date DATE,
-  token TEXT REFERENCES interviews(token)
+  token TEXT REFERENCES interviews(token),
+  skills TEXT,
+  experience_years INTEGER,
+  education TEXT,
+  ats_explanation TEXT,
+  matched_role_id TEXT REFERENCES job_descriptions(id),
+  match_percentage INTEGER,
+  match_reasoning TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_candidates_token ON candidates(token);
