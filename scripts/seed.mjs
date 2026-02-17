@@ -82,17 +82,20 @@ async function seed() {
   }
   console.log("  - interviews");
 
-  // 5. Candidates
+  // 5. Candidates (token_created_at/token_expires_at for candidate-sourced tokens; future dates for demo links)
+  const now = new Date();
+  const expiresDemo = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const createdDemo = now.toISOString();
   const candidates = [
-    ["1", "Jane Doe", "jane.doe@example.com", "+91 98765 43210", "Frontend Developer", 78, 85, "completed", "2025-02-10", "demo123"],
-    ["2", "John Smith", "john.smith@example.com", "+91 98123 45678", "Full Stack Engineer", 82, null, "in_progress", "2025-02-11", "fe789"],
-    ["3", "Sarah Wilson", "sarah.wilson@example.com", "+91 98234 56789", "Frontend Developer", 65, 72, "completed", "2025-02-09", "demo123"],
-    ["4", "Michael Chen", "michael.chen@example.com", "+91 97654 32109", "Backend Developer", 91, null, "pending", null, null],
+    ["1", "Jane Doe", "jane.doe@example.com", "+91 98765 43210", "Frontend Developer", 78, 85, "completed", "2025-02-10", "demo123", createdDemo, expiresDemo],
+    ["2", "John Smith", "john.smith@example.com", "+91 98123 45678", "Full Stack Engineer", 82, null, "in_progress", "2025-02-11", "fe789", createdDemo, expiresDemo],
+    ["3", "Sarah Wilson", "sarah.wilson@example.com", "+91 98234 56789", "Frontend Developer", 65, 72, "completed", "2025-02-09", "demo123", createdDemo, expiresDemo],
+    ["4", "Michael Chen", "michael.chen@example.com", "+91 97654 32109", "Backend Developer", 91, null, "pending", null, null, null, null],
   ];
-  for (const [id, name, email, phone, position, atsScore, interviewScore, status, interviewDate, token] of candidates) {
+  for (const [id, name, email, phone, position, atsScore, interviewScore, status, interviewDate, token, tokenCreatedAt, tokenExpiresAt] of candidates) {
     await sql`
-      INSERT INTO candidates (id, name, email, phone, position, ats_score, interview_score, status, interview_date, token)
-      VALUES (${id}, ${name}, ${email}, ${phone}, ${position}, ${atsScore}, ${interviewScore}, ${status}, ${interviewDate || null}, ${token})
+      INSERT INTO candidates (id, name, email, phone, position, ats_score, interview_score, status, interview_date, token, token_created_at, token_expires_at)
+      VALUES (${id}, ${name}, ${email}, ${phone}, ${position}, ${atsScore}, ${interviewScore}, ${status}, ${interviewDate || null}, ${token}, ${tokenCreatedAt || null}::timestamptz, ${tokenExpiresAt || null}::timestamptz)
       ON CONFLICT (id) DO NOTHING
     `;
   }
@@ -118,5 +121,5 @@ async function seed() {
 
 seed().catch((err) => {
   console.error(err);
-  process.exit(1);
+  process.exit(1);l
 });

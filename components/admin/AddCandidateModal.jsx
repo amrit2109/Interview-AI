@@ -23,10 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  getJobDescriptionsAction,
-  createCandidateMockAction,
-} from "@/app/admin/actions";
+import { getJobDescriptionsAction } from "@/app/admin/actions";
 import { UploadIcon, FileTextIcon, BarChart3Icon, BriefcaseIcon } from "lucide-react";
 
 /**
@@ -165,26 +162,37 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
     setIsSubmitting(true);
     try {
       const matchedJd = jobDescriptions.find((jd) => jd.jobName === position);
-      const { data, error: apiError } = await createCandidateMockAction({
-        name: trimmedName,
-        email: trimmedEmail,
-        phone: phone?.trim() || undefined,
-        position: position || undefined,
-        atsScore: parsed?.ats?.score ?? parsed?.atsScore,
-        skills: skills?.trim() || undefined,
-        experienceYears: parsed?.candidate?.experienceYears ?? undefined,
-        education: education?.trim() || undefined,
-        atsExplanation: parsed?.ats?.explanation || undefined,
-        matchedRoleId: matchedJd?.id ?? parsed?.match?.roleId ?? undefined,
-        matchPercentage: parsed?.match?.percentage ?? undefined,
-        matchReasoning: parsed?.match?.reasoning || undefined,
+      const res = await fetch("/api/candidates/send-interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          phone: phone?.trim() || undefined,
+          position: position || undefined,
+          atsScore: parsed?.ats?.score ?? parsed?.atsScore,
+          skills: skills?.trim() || undefined,
+          experienceYears: parsed?.candidate?.experienceYears ?? undefined,
+          education: education?.trim() || undefined,
+          atsExplanation: parsed?.ats?.explanation || undefined,
+          matchedRoleId: matchedJd?.id ?? parsed?.match?.roleId ?? undefined,
+          matchPercentage: parsed?.match?.percentage ?? undefined,
+          matchReasoning: parsed?.match?.reasoning || undefined,
+        }),
       });
-      if (apiError) {
+      const json = await res.json();
+      const apiError = json?.error;
+      const data = json?.data;
+      if (!res.ok && res.status !== 207) {
+        setError(apiError ?? "Failed to send interview link.");
+        return;
+      }
+      if (apiError && !data) {
         setError(apiError);
         return;
       }
       handleOpenChange(false);
-      onSuccess?.(data);
+      onSuccess?.(data ?? json);
     } finally {
       setIsSubmitting(false);
     }

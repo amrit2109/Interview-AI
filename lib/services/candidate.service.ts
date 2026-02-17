@@ -1,0 +1,268 @@
+import { sql } from "@/lib/db";
+import {
+  generateInterviewToken,
+  getTokenTimestamps,
+  isTokenExpired,
+} from "@/lib/utils/interview-token";
+
+export interface CreateCandidateWithInvitePayload {
+  name: string;
+  email: string;
+  phone?: string;
+  position?: string;
+  atsScore?: number;
+  skills?: string;
+  experienceYears?: number;
+  education?: string;
+  atsExplanation?: string;
+  matchedRoleId?: string;
+  matchPercentage?: number;
+  matchReasoning?: string;
+}
+
+export interface CandidateWithToken {
+  id: string;
+  name: string;
+  email: string;
+  token: string;
+  tokenCreatedAt: Date;
+  tokenExpiresAt: Date;
+  phone?: string | null;
+  position?: string | null;
+  atsScore?: number | null;
+  skills?: string | null;
+  experienceYears?: number | null;
+  education?: string | null;
+}
+
+export interface TokenValidationResult {
+  valid: boolean;
+  expired?: boolean;
+  candidate?: CandidateWithToken;
+  error?: string;
+}
+
+function toCandidateWithToken(row: {
+  id: string;
+  name: string;
+  email: string;
+  token: string | null;
+  token_created_at: Date | string | null;
+  token_expires_at: Date | string | null;
+  phone?: string | null;
+  position?: string | null;
+  ats_score?: number | null;
+  skills?: string | null;
+  experience_years?: number | null;
+  education?: string | null;
+}): CandidateWithToken | null {
+  if (!row || !row.token) return null;
+  const tokenCreatedAt =
+    row.token_created_at instanceof Date
+      ? row.token_created_at
+      : row.token_created_at
+        ? new Date(row.token_created_at)
+        : new Date(0);
+  const tokenExpiresAt =
+    row.token_expires_at instanceof Date
+      ? row.token_expires_at
+      : row.token_expires_at
+        ? new Date(row.token_expires_at)
+        : new Date(0);
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    token: row.token,
+    tokenCreatedAt,
+    tokenExpiresAt,
+    phone: row.phone ?? null,
+    position: row.position ?? null,
+    atsScore: row.ats_score ?? null,
+    skills: row.skills ?? null,
+    experienceYears: row.experience_years ?? null,
+    education: row.education ?? null,
+  };
+}
+
+/**
+ * Create a candidate with a generated interview token and timestamps.
+ * Retries token generation if uniqueness collision (unlikely).
+ */
+export async function createCandidateWithInvite(
+  payload: CreateCandidateWithInvitePayload
+): Promise<{ data: CandidateWithToken | null; error: string | null }> {
+  // #region agent log
+  fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      location: "candidate.service.ts:createCandidateWithInvite",
+      message: "createCandidateWithInvite entry",
+      data: { sqlNull: !sql, name: payload.name?.slice(0, 20), email: payload.email?.slice(0, 30) },
+      timestamp: Date.now(),
+      hypothesisId: "H2",
+    }),
+  }).catch(() => {});
+  // #endregion
+  if (!sql) return { data: null, error: "Database not configured." };
+
+  const {
+    name,
+    email,
+    phone,
+    position,
+    atsScore,
+    skills,
+    experienceYears,
+    education,
+    atsExplanation,
+    matchedRoleId,
+    matchPercentage,
+    matchReasoning,
+  } = payload;
+
+  if (!name?.trim()) return { data: null, error: "Name is required." };
+  if (!email?.trim()) return { data: null, error: "Email is required." };
+
+  const maxRetries = 5;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const token = generateInterviewToken();
+    const { tokenCreatedAt, tokenExpiresAt } = getTokenTimestamps();
+
+    try {
+      const existing = await sql`SELECT 1 FROM candidates WHERE token = ${token} LIMIT 1`;
+      if (existing.length > 0) continue;
+
+      const idResult =
+        await sql`SELECT COALESCE(MAX(CAST(id AS INTEGER)), 0) + 1 AS next_id FROM candidates`;
+      const id = String(idResult[0]?.next_id ?? 1);
+      const atsVal = typeof atsScore === "number" ? Math.round(atsScore) : null;
+
+      // #region agent log
+      fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: "candidate.service.ts:beforeInsert",
+          message: "before INSERT",
+          data: {
+            id,
+            token,
+            tokenCreatedAtType: typeof tokenCreatedAt,
+            tokenExpiresAtType: typeof tokenExpiresAt,
+            attempt,
+          },
+          timestamp: Date.now(),
+          hypothesisId: "H3,H4",
+        }),
+      }).catch(() => {});
+      // #endregion
+
+      await sql`
+        INSERT INTO candidates (
+          id, name, email, phone, position, ats_score, interview_score, status,
+          interview_date, token, token_created_at, token_expires_at,
+          skills, experience_years, education, ats_explanation,
+          matched_role_id, match_percentage, match_reasoning
+        )
+        VALUES (
+          ${id}, ${name.trim()}, ${email.trim().toLowerCase()}, ${phone?.trim() ?? null},
+          ${position?.trim() ?? "Unassigned"}, ${atsVal}, ${null}, ${"pending"},
+          ${null}, ${token}, ${tokenCreatedAt}, ${tokenExpiresAt},
+          ${skills?.trim() ?? null}, ${typeof experienceYears === "number" ? experienceYears : null},
+          ${education?.trim() ?? null}, ${atsExplanation?.trim() ?? null},
+          ${matchedRoleId?.trim() ?? null}, ${typeof matchPercentage === "number" ? matchPercentage : null},
+          ${matchReasoning?.trim() ?? null}
+        )
+      `;
+
+      const candidate: CandidateWithToken = {
+        id,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        token,
+        tokenCreatedAt,
+        tokenExpiresAt,
+        phone: phone?.trim() ?? null,
+        position: position?.trim() ?? "Unassigned",
+        atsScore: atsVal,
+        skills: skills?.trim() ?? null,
+        experienceYears: typeof experienceYears === "number" ? experienceYears : null,
+        education: education?.trim() ?? null,
+      };
+      return { data: candidate, error: null };
+    } catch (err) {
+      // #region agent log
+      fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: "candidate.service.ts:catch",
+          message: "createCandidateWithInvite catch",
+          data: {
+            errName: err instanceof Error ? err.name : "unknown",
+            errMsg: err instanceof Error ? err.message : String(err),
+            errCode: err && typeof err === "object" && "code" in err ? (err as { code?: string }).code : undefined,
+            attempt,
+          },
+          timestamp: Date.now(),
+          hypothesisId: "H1,H3,H4",
+        }),
+      }).catch(() => {});
+      // #endregion
+      console.error("createCandidateWithInvite:", err);
+      if (attempt === maxRetries - 1) {
+        return { data: null, error: "Failed to create candidate." };
+      }
+    }
+  }
+  return { data: null, error: "Failed to generate unique token." };
+}
+
+/**
+ * Get candidate by interview token and validate expiry.
+ */
+export async function getCandidateByInterviewToken(
+  token: string
+): Promise<TokenValidationResult> {
+  if (!sql) return { valid: false, error: "Database not configured." };
+  if (!token?.trim()) return { valid: false, error: "Invalid or expired interview link." };
+
+  try {
+    const rows = await sql`
+      SELECT id, name, email, token, token_created_at, token_expires_at,
+             phone, position, ats_score, skills, experience_years, education
+      FROM candidates
+      WHERE token = ${token.trim()}
+      LIMIT 1
+    `;
+    const row = rows[0] as {
+      id: string;
+      name: string;
+      email: string;
+      token: string | null;
+      token_created_at: Date | string | null;
+      token_expires_at: Date | string | null;
+      phone?: string | null;
+      position?: string | null;
+      ats_score?: number | null;
+      skills?: string | null;
+      experience_years?: number | null;
+      education?: string | null;
+    } | undefined;
+    if (!row) return { valid: false, error: "Invalid or expired interview link." };
+
+    const candidate = toCandidateWithToken(row);
+    if (!candidate) return { valid: false, error: "Invalid or expired interview link." };
+
+    if (isTokenExpired(candidate.tokenExpiresAt)) {
+      return { valid: false, expired: true, error: "This interview link has expired." };
+    }
+
+    return { valid: true, candidate };
+  } catch (err) {
+    console.error("getCandidateByInterviewToken:", err);
+    return { valid: false, error: "Invalid or expired interview link." };
+  }
+}

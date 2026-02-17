@@ -5,12 +5,13 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getInterviewByToken, getInterviewQuestions } from "@/lib/mock-api";
+import { getInterviewDisplayByToken } from "@/lib/services/interview-token-guard";
+import { getInterviewQuestions } from "@/lib/mock-api";
 import { MicIcon, ArrowRightIcon } from "lucide-react";
 
 async function InterviewSessionContent({ token }) {
   const [interviewRes, questionsRes] = await Promise.all([
-    getInterviewByToken(token),
+    getInterviewDisplayByToken(token),
     getInterviewQuestions(),
   ]);
 
@@ -21,17 +22,6 @@ async function InterviewSessionContent({ token }) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center px-4">
         <p className="text-muted-foreground">{interviewError ?? "Interview not found."}</p>
-        <Button asChild variant="outline" className="mt-4">
-          <Link href="/">Return home</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  if (interview.status !== "valid") {
-    return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center px-4">
-        <p className="text-muted-foreground">This interview link is no longer valid.</p>
         <Button asChild variant="outline" className="mt-4">
           <Link href="/">Return home</Link>
         </Button>
