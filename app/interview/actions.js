@@ -1,6 +1,6 @@
 "use server";
 
-import { submitPreScreen } from "@/lib/mock-api";
+import { submitPreScreen } from "@/lib/api";
 
 /**
  * Server action: submit pre-screening answers for an interview token.

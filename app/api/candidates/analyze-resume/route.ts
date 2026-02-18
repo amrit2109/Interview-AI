@@ -3,7 +3,7 @@ import { extractTextFromResume } from "@/lib/services/resume_text_extractor";
 import { parseResumeWithGemini } from "@/lib/services/resume_ai_parser";
 import { scoreATS } from "@/lib/services/ats_scorer";
 import { matchBestJob } from "@/lib/services/job_matcher";
-import { getActiveJobDescriptions } from "@/lib/mock-api";
+import { getActiveJobDescriptions } from "@/lib/api";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES = [

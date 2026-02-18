@@ -3,7 +3,7 @@ import {
   getCandidateByInterviewToken,
   completeInterviewRecording,
 } from "@/lib/services/candidate.service";
-import { verifyObjectExists } from "@/lib/storage";
+import { verifyObjectExists, getRecordingPrefixForToken } from "@/lib/storage";
 
 interface CompleteBody {
   objectKey?: string;
@@ -55,20 +55,15 @@ export async function POST(
     );
   }
 
+  const expectedPrefix = getRecordingPrefixForToken(token.trim());
+  if (!body.objectKey.startsWith(expectedPrefix)) {
+    return NextResponse.json(
+      { error: "Invalid object key for this interview." },
+      { status: 400 }
+    );
+  }
+
   const { exists, error: verifyError } = await verifyObjectExists(body.objectKey);
-  // #region agent log
-  fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "app/api/interview/[token]/recording/complete/route.ts",
-      message: "complete verifyObjectExists result",
-      data: { objectKey: body.objectKey, exists, verifyError: verifyError ?? null },
-      timestamp: Date.now(),
-      hypothesisId: "H4",
-    }),
-  }).catch(() => {});
-  // #endregion
   if (verifyError || !exists) {
     return NextResponse.json(
       { error: "Upload verification failed. Recording may not have been uploaded." },

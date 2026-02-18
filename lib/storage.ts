@@ -11,13 +11,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import https from "node:https";
-
-const endpoint = process.env.S3_ENDPOINT;
-const region = process.env.S3_REGION ?? "us-east-1";
-const bucket = process.env.S3_BUCKET;
-const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-const publicBaseUrl = process.env.S3_PUBLIC_BASE_URL;
+import { getEnv } from "@/lib/env";
 
 /** TLS 1.2 minimum to avoid handshake failure with Cloudflare R2 on some Node/Windows builds. */
 const httpsAgent = new https.Agent({
@@ -26,9 +20,24 @@ const httpsAgent = new https.Agent({
   keepAlive: true,
 });
 
-function getClient(): S3Client | null {
-  if (!bucket || !accessKeyId || !secretAccessKey) return null;
-  return new S3Client({
+function getStorageConfig(): {
+  client: S3Client | null;
+  bucket: string | undefined;
+  region: string;
+  publicBaseUrl: string | undefined;
+} {
+  const env = getEnv();
+  const endpoint = env.S3_ENDPOINT;
+  const region = env.S3_REGION ?? "us-east-1";
+  const bucket = env.S3_BUCKET;
+  const accessKeyId = env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY;
+  const publicBaseUrl = env.S3_PUBLIC_BASE_URL;
+
+  if (!bucket || !accessKeyId || !secretAccessKey) {
+    return { client: null, bucket: undefined, region, publicBaseUrl };
+  }
+  const client = new S3Client({
     region,
     ...(endpoint && { endpoint }),
     credentials: { accessKeyId, secretAccessKey },
@@ -39,9 +48,10 @@ function getClient(): S3Client | null {
       requestTimeout: 120_000,
     }),
   });
+  return { client, bucket, region, publicBaseUrl };
 }
 
-const client = getClient();
+const { client, bucket, region, publicBaseUrl } = getStorageConfig();
 
 export function isStorageConfigured(): boolean {
   return !!client && !!bucket;
@@ -51,6 +61,12 @@ export function getRecordingObjectKey(token: string): string {
   const safe = token.replace(/[^a-zA-Z0-9_-]/g, "_");
   const ts = Date.now();
   return `recordings/${safe}/${ts}.webm`;
+}
+
+/** Prefix for object keys belonging to this token. Used to validate client-provided objectKey. */
+export function getRecordingPrefixForToken(token: string): string {
+  const safe = token.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `recordings/${safe}/`;
 }
 
 export interface PresignedUploadResult {
@@ -64,19 +80,6 @@ export async function createPresignedUploadUrl(
   token: string,
   contentType = "video/webm"
 ): Promise<{ data: PresignedUploadResult | null; error: string | null }> {
-  // #region agent log
-  fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "lib/storage.ts:createPresignedUploadUrl",
-      message: "createPresignedUploadUrl entry",
-      data: { hasClient: !!client, hasBucket: !!bucket, bucket: bucket ?? null, hasEndpoint: !!endpoint, region },
-      timestamp: Date.now(),
-      hypothesisId: "H1,H5",
-    }),
-  }).catch(() => {});
-  // #endregion
   if (!client || !bucket) {
     return {
       data: null,
@@ -97,38 +100,12 @@ export async function createPresignedUploadUrl(
     });
     const expiresIn = 900; // 15 min
     const uploadUrl = await getSignedUrl(client, command, { expiresIn });
-    // #region agent log
-    fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "lib/storage.ts:createPresignedUploadUrl",
-        message: "presigned URL created",
-        data: { objectKey, finalUrlPrefix: finalUrl.slice(0, 60) },
-        timestamp: Date.now(),
-        hypothesisId: "H1,H5",
-      }),
-    }).catch(() => {});
-    // #endregion
     return {
       data: { uploadUrl, objectKey, finalUrl, expiresIn },
       error: null,
     };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : "Failed to create upload URL.";
-    // #region agent log
-    fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "lib/storage.ts:createPresignedUploadUrl",
-        message: "createPresignedUploadUrl error",
-        data: { error: errMsg },
-        timestamp: Date.now(),
-        hypothesisId: "H1,H5",
-      }),
-    }).catch(() => {});
-    // #endregion
     console.error("createPresignedUploadUrl:", err);
     return {
       data: null,

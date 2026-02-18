@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MonitorIcon, AlertCircleIcon, Loader2Icon } from "lucide-react";
-import { isSupported, startRecording } from "@/lib/services/screen-recording.service";
+import { useRecording } from "@/context/RecordingContext";
 
 /**
  * Blocking modal requiring screen share permission before Step 2.
  * Cannot proceed without granting permission.
  */
 export function ScreenShareGate({ onGranted }) {
+  const { isSupported, startRecording } = useRecording();
   const [status, setStatus] = useState("idle"); // idle | requesting | denied | unsupported
   const [error, setError] = useState("");
 

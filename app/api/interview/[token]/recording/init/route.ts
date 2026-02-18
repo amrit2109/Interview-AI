@@ -15,19 +15,6 @@ export async function POST(
   }
 
   const validation = await getCandidateByInterviewToken(token.trim());
-  // #region agent log
-  fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "app/api/interview/[token]/recording/init/route.ts",
-      message: "init after validation",
-      data: { valid: validation.valid, error: validation.error ?? null },
-      timestamp: Date.now(),
-      hypothesisId: "H1",
-    }),
-  }).catch(() => {});
-  // #endregion
   if (!validation.valid || !validation.candidate) {
     return NextResponse.json(
       { error: validation.error ?? "Invalid or expired interview link." },
@@ -36,19 +23,6 @@ export async function POST(
   }
 
   const { data, error } = await createPresignedUploadUrl(token.trim());
-  // #region agent log
-  fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "app/api/interview/[token]/recording/init/route.ts",
-      message: "init createPresignedUploadUrl result",
-      data: { hasData: !!data, error: error ?? null },
-      timestamp: Date.now(),
-      hypothesisId: "H1",
-    }),
-  }).catch(() => {});
-  // #endregion
   if (error || !data) {
     return NextResponse.json(
       { error: error ?? "Failed to create upload URL." },

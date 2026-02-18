@@ -7,13 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScreenShareGate } from "@/components/interview/ScreenShareGate";
-import {
-  subscribe,
-  stopRecording,
-  terminateRecording,
-  getRecordingState,
-  isRecordingActive,
-} from "@/lib/services/screen-recording.service";
+import { useRecording } from "@/context/RecordingContext";
 import { MicIcon, ArrowRightIcon, CircleIcon, AlertTriangleIcon } from "lucide-react";
 
 const UPLOAD_TIMEOUT_MS = 120_000;
@@ -21,6 +15,12 @@ const UPLOAD_RETRIES = 2;
 
 export function InterviewSessionClient({ token, interview, questions }) {
   const router = useRouter();
+  const {
+    subscribe,
+    stopRecording,
+    terminateRecording,
+    isRecordingActive,
+  } = useRecording();
   const [gatePassed, setGatePassed] = useState(false);
   const [violated, setViolated] = useState(false);
   const [violationReason, setViolationReason] = useState("");
@@ -73,12 +73,12 @@ export function InterviewSessionClient({ token, interview, questions }) {
   useEffect(() => {
     const handleUnload = () => {
       if (isRecordingActive()) {
-        terminateRecording();
         const payload = JSON.stringify({ reason: "page_closed_or_refreshed" });
         navigator.sendBeacon(
           `/api/interview/${token}/recording/fail`,
           new Blob([payload], { type: "application/json" })
         );
+        terminateRecording();
       }
     };
     window.addEventListener("beforeunload", handleUnload);
@@ -96,19 +96,6 @@ export function InterviewSessionClient({ token, interview, questions }) {
     setUploadError("");
 
     const blob = await stopRecording();
-    // #region agent log
-    fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "InterviewSessionClient.jsx:handleComplete",
-        message: "handleComplete blob",
-        data: { hasBlob: !!blob, blobSize: blob?.size ?? 0 },
-        timestamp: Date.now(),
-        hypothesisId: "H2",
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!blob) {
       setUploadError("No recording data. Please try again.");
       setIsUploading(false);
@@ -128,19 +115,6 @@ export function InterviewSessionClient({ token, interview, questions }) {
           ),
         ]);
 
-        // #region agent log
-        fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "InterviewSessionClient.jsx:handleComplete",
-            message: "upload response",
-            data: { ok: uploadRes.ok, status: uploadRes.status, attempt },
-            timestamp: Date.now(),
-            hypothesisId: "H3,H4",
-          }),
-        }).catch(() => {});
-        // #endregion
         if (!uploadRes.ok) {
           const err = await uploadRes.json().catch(() => ({}));
           throw new Error(err.error ?? "Upload failed.");
@@ -150,23 +124,6 @@ export function InterviewSessionClient({ token, interview, questions }) {
         return;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Upload failed.";
-        // #region agent log
-        fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "InterviewSessionClient.jsx:handleComplete",
-            message: "upload catch",
-            data: {
-              attempt,
-              errMessage: err instanceof Error ? err.message : String(err),
-              errName: err instanceof Error ? err.name : undefined,
-            },
-            timestamp: Date.now(),
-            hypothesisId: "H3,H4",
-          }),
-        }).catch(() => {});
-        // #endregion
         if (attempt === UPLOAD_RETRIES) {
           setUploadError(msg);
           setUploadFailedTerminal(true);

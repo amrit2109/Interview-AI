@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 import { Badge } from "@/components/ui/badge";
-import { getCandidates } from "@/lib/mock-api";
+import { getCandidates } from "@/lib/api";
 import { CandidateRowActions } from "@/components/admin/CandidateRowActions";
 
 const STATUS_VARIANTS = {

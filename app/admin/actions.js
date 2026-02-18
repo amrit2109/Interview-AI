@@ -12,7 +12,7 @@ import {
   deleteCandidateById,
   deleteJobDescriptionById,
   updateJobDescriptionOpeningsById,
-} from "@/lib/mock-api";
+} from "@/lib/api";
 
 /**
  * Server action: clear admin session cookie and redirect to login.
@@ -70,7 +70,7 @@ export async function createJobDescriptionAction(payload) {
 /**
  * Server action: update job description openings.
  * @param {{ job_description_id: string | number; openings: number }} params - RORO style
- * @returns {Promise<{ ok: boolean; data?: object; error_message?: string }>}
+ * @returns {Promise<{ ok: boolean; data?: object; error?: string }>}
  */
 export async function updateJobDescriptionOpeningsAction({ job_description_id, openings }) {
   const result = await updateJobDescriptionOpeningsById({ job_description_id, openings });
@@ -84,7 +84,7 @@ export async function updateJobDescriptionOpeningsAction({ job_description_id, o
 /**
  * Server action: delete job description.
  * @param {{ job_description_id: string | number }} params - RORO style
- * @returns {Promise<{ ok: boolean; deleted_id?: string; error_message?: string }>}
+ * @returns {Promise<{ ok: boolean; deleted_id?: string; error?: string }>}
  */
 export async function deleteJobDescriptionAction({ job_description_id }) {
   const result = await deleteJobDescriptionById({ job_description_id });
@@ -98,7 +98,7 @@ export async function deleteJobDescriptionAction({ job_description_id }) {
 /**
  * Server action: delete candidate.
  * @param {{ candidate_id: string | number }} params - RORO style
- * @returns {Promise<{ ok: boolean; deleted_id?: string; error_message?: string }>}
+ * @returns {Promise<{ ok: boolean; deleted_id?: string; error?: string }>}
  */
 export async function deleteCandidateAction({ candidate_id }) {
   const result = await deleteCandidateById({ candidate_id });

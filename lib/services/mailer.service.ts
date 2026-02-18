@@ -1,8 +1,19 @@
 import nodemailer from "nodemailer";
 import type { CandidateWithToken } from "./candidate.service";
+import { getEnv } from "@/lib/env";
+
+function escapeHtml(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function getBaseUrl(): string {
-  const url = process.env.APP_BASE_URL ?? process.env.VERCEL_URL;
+  const env = getEnv();
+  const url = env.APP_BASE_URL ?? env.VERCEL_URL;
   if (url) {
     const base = url.startsWith("http") ? url : `https://${url}`;
     return base.replace(/\/$/, "");
@@ -11,11 +22,12 @@ function getBaseUrl(): string {
 }
 
 function createTransporter(): nodemailer.Transporter | null {
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const secure = process.env.SMTP_SECURE === "true";
+  const env = getEnv();
+  const host = env.SMTP_HOST;
+  const port = env.SMTP_PORT;
+  const user = env.SMTP_USER;
+  const pass = env.SMTP_PASS;
+  const secure = env.SMTP_SECURE === "true";
 
   if (!host || !user || !pass) {
     console.error(
@@ -45,9 +57,14 @@ export async function sendInterviewInviteEmail(
     return "Email service is not configured.";
   }
 
-  const from = process.env.EMAIL_FROM ?? process.env.SMTP_USER ?? "amritpal2109@gmail.com";
+  const env = getEnv();
+  const from = env.EMAIL_FROM ?? env.SMTP_USER;
+  if (!from) {
+    return "Email configuration error: EMAIL_FROM or SMTP_USER must be set.";
+  }
   const baseUrl = getBaseUrl();
   const interviewUrl = `${baseUrl}/interview/${candidate.token}`;
+  const safeName = escapeHtml(candidate.name);
 
   const html = `
 <!DOCTYPE html>
@@ -62,7 +79,7 @@ export async function sendInterviewInviteEmail(
     <div style="background: white; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
       <h1 style="margin: 0 0 16px; font-size: 24px; font-weight: 600;">Your Interview Invitation</h1>
       <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #52525b;">
-        Hi ${candidate.name},
+        Hi ${safeName},
       </p>
       <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #52525b;">
         You have been invited to complete an AI voice interview. Click the button below to get started.

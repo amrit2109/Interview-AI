@@ -7,7 +7,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { SectionHeader } from "@/components/dashboard/SectionHeader";
 import { RecentCandidatesList } from "@/components/dashboard/RecentCandidatesList";
 import { UpcomingInterviewsList } from "@/components/dashboard/UpcomingInterviewsList";
-import { getCandidates, getJobDescriptions } from "@/lib/mock-api";
+import { getCandidates, getJobDescriptions } from "@/lib/api";
 import {
   UsersIcon,
   FileTextIcon,

@@ -92,19 +92,6 @@ function toCandidateWithToken(row: {
 export async function createCandidateWithInvite(
   payload: CreateCandidateWithInvitePayload
 ): Promise<{ data: CandidateWithToken | null; error: string | null }> {
-  // #region agent log
-  fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "candidate.service.ts:createCandidateWithInvite",
-      message: "createCandidateWithInvite entry",
-      data: { sqlNull: !sql, name: payload.name?.slice(0, 20), email: payload.email?.slice(0, 30) },
-      timestamp: Date.now(),
-      hypothesisId: "H2",
-    }),
-  }).catch(() => {});
-  // #endregion
   if (!sql) return { data: null, error: "Database not configured." };
 
   const {
@@ -134,40 +121,17 @@ export async function createCandidateWithInvite(
       const existing = await sql`SELECT 1 FROM candidates WHERE token = ${token} LIMIT 1`;
       if (existing.length > 0) continue;
 
-      const idResult =
-        await sql`SELECT COALESCE(MAX(CAST(id AS INTEGER)), 0) + 1 AS next_id FROM candidates`;
-      const id = String(idResult[0]?.next_id ?? 1);
       const atsVal = typeof atsScore === "number" ? Math.round(atsScore) : null;
 
-      // #region agent log
-      fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location: "candidate.service.ts:beforeInsert",
-          message: "before INSERT",
-          data: {
-            id,
-            token,
-            tokenCreatedAtType: typeof tokenCreatedAt,
-            tokenExpiresAtType: typeof tokenExpiresAt,
-            attempt,
-          },
-          timestamp: Date.now(),
-          hypothesisId: "H3,H4",
-        }),
-      }).catch(() => {});
-      // #endregion
-
-      await sql`
+      const inserted = await sql`
         INSERT INTO candidates (
-          id, name, email, phone, position, ats_score, interview_score, status,
+          name, email, phone, position, ats_score, interview_score, status,
           interview_date, token, token_created_at, token_expires_at,
           skills, experience_years, education, ats_explanation,
           matched_role_id, match_percentage, match_reasoning
         )
         VALUES (
-          ${id}, ${name.trim()}, ${email.trim().toLowerCase()}, ${phone?.trim() ?? null},
+          ${name.trim()}, ${email.trim().toLowerCase()}, ${phone?.trim() ?? null},
           ${position?.trim() ?? "Unassigned"}, ${atsVal}, ${null}, ${"pending"},
           ${null}, ${token}, ${tokenCreatedAt}, ${tokenExpiresAt},
           ${skills?.trim() ?? null}, ${typeof experienceYears === "number" ? experienceYears : null},
@@ -175,7 +139,9 @@ export async function createCandidateWithInvite(
           ${matchedRoleId?.trim() ?? null}, ${typeof matchPercentage === "number" ? matchPercentage : null},
           ${matchReasoning?.trim() ?? null}
         )
+        RETURNING id
       `;
+      const id = inserted[0]?.id ? String(inserted[0].id) : "";
 
       const candidate: CandidateWithToken = {
         id,
@@ -193,24 +159,6 @@ export async function createCandidateWithInvite(
       };
       return { data: candidate, error: null };
     } catch (err) {
-      // #region agent log
-      fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location: "candidate.service.ts:catch",
-          message: "createCandidateWithInvite catch",
-          data: {
-            errName: err instanceof Error ? err.name : "unknown",
-            errMsg: err instanceof Error ? err.message : String(err),
-            errCode: err && typeof err === "object" && "code" in err ? (err as { code?: string }).code : undefined,
-            attempt,
-          },
-          timestamp: Date.now(),
-          hypothesisId: "H1,H3,H4",
-        }),
-      }).catch(() => {});
-      // #endregion
       console.error("createCandidateWithInvite:", err);
       if (attempt === maxRetries - 1) {
         return { data: null, error: "Failed to create candidate." };
@@ -264,6 +212,24 @@ export async function getCandidateByInterviewToken(
   } catch (err) {
     console.error("getCandidateByInterviewToken:", err);
     return { valid: false, error: "Invalid or expired interview link." };
+  }
+}
+
+/**
+ * Check if a candidate already has a completed recording (for idempotent upload retries).
+ */
+export async function isRecordingAlreadyCompleted(token: string): Promise<boolean> {
+  if (!sql) return false;
+  if (!token?.trim()) return false;
+  try {
+    const rows = await sql`
+      SELECT 1 FROM candidates
+      WHERE token = ${token.trim()} AND interview_recording_status = 'completed'
+      LIMIT 1
+    `;
+    return rows.length > 0;
+  } catch {
+    return false;
   }
 }
 

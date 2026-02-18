@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, verifyToken } from "./lib/auth";
 
+const ADMIN_API_PATHS = [
+  "/api/candidates/send-interview",
+  "/api/candidates/analyze-resume",
+];
+
+function isAdminApiPath(pathname) {
+  return ADMIN_API_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
+
+  if (isAdminApiPath(pathname)) {
+    const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+    const validSession = token ? await verifyToken(token) : null;
+    if (!validSession) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
 
   if (!pathname.startsWith("/admin")) {
     return NextResponse.next();
@@ -26,5 +44,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/candidates/send-interview", "/api/candidates/analyze-resume"],
 };

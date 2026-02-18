@@ -10,7 +10,7 @@ import { AlertCircleIcon } from "lucide-react";
 async function PreScreenContent({ token }) {
   const { data, error, expired } = await getInterviewDisplayByToken(token);
 
-  if (error) {
+  if (error || !data) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center px-4">
         <div className="mx-auto max-w-md space-y-4 text-center">
@@ -20,7 +20,7 @@ async function PreScreenContent({ token }) {
           <h1 className="text-xl font-semibold">
             {expired ? "Link Expired" : "Invalid or Expired Link"}
           </h1>
-          <p className="text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground">{error ?? "Invalid or expired link."}</p>
           <Button asChild variant="outline">
             <Link href="/">Return home</Link>
           </Button>

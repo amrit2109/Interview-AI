@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCandidateByInterviewToken } from "@/lib/services/candidate.service";
-import { completeInterviewRecording } from "@/lib/services/candidate.service";
+import {
+  getCandidateByInterviewToken,
+  completeInterviewRecording,
+  isRecordingAlreadyCompleted,
+} from "@/lib/services/candidate.service";
 import { createPresignedUploadUrl } from "@/lib/storage";
 
 const MAX_BODY_BYTES = 512 * 1024 * 1024; // 512 MB
@@ -28,6 +31,10 @@ export async function POST(
       { error: validation.error ?? "Invalid or expired interview link." },
       { status: 403 }
     );
+  }
+
+  if (await isRecordingAlreadyCompleted(token.trim())) {
+    return NextResponse.json({ ok: true });
   }
 
   const contentType = request.headers.get("content-type") ?? "video/webm";

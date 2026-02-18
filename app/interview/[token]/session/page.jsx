@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { getInterviewDisplayByToken } from "@/lib/services/interview-token-guard";
-import { getInterviewQuestions, getPreScreen } from "@/lib/mock-api";
+import { getInterviewQuestions, getPreScreen } from "@/lib/api";
 import { InterviewSessionClient } from "@/components/interview/InterviewSessionClient";
+import { RecordingProvider } from "@/context/RecordingContext";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +36,13 @@ async function InterviewSessionContent({ token }) {
   }
 
   return (
-    <InterviewSessionClient
-      token={token}
-      interview={interview}
-      questions={questions ?? []}
-    />
+    <RecordingProvider>
+      <InterviewSessionClient
+        token={token}
+        interview={interview}
+        questions={questions ?? []}
+      />
+    </RecordingProvider>
   );
 }
 

@@ -1,5 +1,9 @@
 import { getCandidateByInterviewToken } from "./candidate.service";
 
+/**
+ * Single source of truth for interview links: candidates.token.
+ * The interviews table is legacy/seed-only; all flows use getCandidateByInterviewToken.
+ */
 const DEFAULT_INSTRUCTIONS = [
   "Find a quiet place with minimal background noise.",
   "Ensure your microphone is working and permissions are granted.",
