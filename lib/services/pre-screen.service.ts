@@ -8,6 +8,7 @@ export interface PreScreenData {
   expectedCtc: string | null;
   relocateToMohali: string | null;
   submittedAt: Date | string;
+  recordingUrl: string | null;
 }
 
 export async function submitPreScreen(
@@ -48,6 +49,7 @@ export async function submitPreScreen(
         expectedCtc: row.expected_ctc,
         relocateToMohali: row.relocate_to_mohali,
         submittedAt: row.submitted_at,
+        recordingUrl: null,
       },
       error: null,
     };
@@ -66,9 +68,12 @@ export async function getPreScreen(token: string): Promise<{ data: PreScreenData
       return { data: null, error: "Invalid or expired interview link." };
     }
     const rows = await sql`
-      SELECT token, experience_years, current_ctc, expected_ctc, relocate_to_mohali, submitted_at
-      FROM pre_screens WHERE token = ${token}
-      ORDER BY submitted_at DESC LIMIT 1
+      SELECT ps.token, ps.experience_years, ps.current_ctc, ps.expected_ctc,
+             ps.relocate_to_mohali, ps.submitted_at, c."Interview_Link" AS recording_url
+      FROM pre_screens ps
+      LEFT JOIN candidates c ON c.token = ps.token
+      WHERE ps.token = ${token}
+      ORDER BY ps.submitted_at DESC LIMIT 1
     `;
     const row = rows[0] as {
       token: string;
@@ -77,6 +82,7 @@ export async function getPreScreen(token: string): Promise<{ data: PreScreenData
       expected_ctc: string | null;
       relocate_to_mohali: string | null;
       submitted_at: Date | string;
+      recording_url: string | null;
     } | undefined;
     if (!row) return { data: null, error: null };
     return {
@@ -87,6 +93,7 @@ export async function getPreScreen(token: string): Promise<{ data: PreScreenData
         expectedCtc: row.expected_ctc,
         relocateToMohali: row.relocate_to_mohali,
         submittedAt: row.submitted_at,
+        recordingUrl: row.recording_url ?? null,
       },
       error: null,
     };

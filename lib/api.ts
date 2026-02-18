@@ -20,6 +20,7 @@ export {
   getCandidates,
   getCandidateById,
   getCandidateReport,
+  getCandidatePreScreensById,
   createCandidateMock,
   analyzeCandidateResumeMock,
 } from "@/lib/services/candidates-admin.service";

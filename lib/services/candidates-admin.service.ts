@@ -21,6 +21,8 @@ export interface CandidateAdmin {
   matchedRoleId: string | null;
   matchPercentage: number | null;
   matchReasoning: string | null;
+  interviewLink: string | null;
+  resumeLink: string | null;
 }
 
 export interface Report {
@@ -30,6 +32,17 @@ export interface Report {
   strengths: string[];
   risks: string[];
   recommendation: string | null;
+}
+
+export interface PreScreenAdminRow {
+  id: number;
+  token: string;
+  experienceYears: string | null;
+  currentCtc: string | null;
+  expectedCtc: string | null;
+  relocateToMohali: string | null;
+  submittedAt: Date | string;
+  recordingUrl: string | null;
 }
 
 function toCandidate(row: Record<string, unknown> | null): CandidateAdmin | null {
@@ -62,6 +75,8 @@ function toCandidate(row: Record<string, unknown> | null): CandidateAdmin | null
     matchedRoleId: row.matched_role_id != null ? String(row.matched_role_id) : null,
     matchPercentage: row.match_percentage != null ? Number(row.match_percentage) : null,
     matchReasoning: row.match_reasoning != null ? String(row.match_reasoning) : null,
+    interviewLink: row["Interview_Link"] != null ? String(row["Interview_Link"]) : null,
+    resumeLink: row.resume_link != null ? String(row.resume_link) : null,
   };
 }
 
@@ -90,6 +105,21 @@ function toReport(row: Record<string, unknown> | null): Report | null {
   };
 }
 
+function toPreScreenAdminRow(row: Record<string, unknown> | null): PreScreenAdminRow | null {
+  if (!row) return null;
+  const submittedAt = row.submitted_at instanceof Date ? row.submitted_at.toISOString() : (row.submitted_at as string | null) ?? "";
+  return {
+    id: Number(row.id),
+    token: String(row.token ?? ""),
+    experienceYears: row.experience_years != null ? String(row.experience_years) : null,
+    currentCtc: row.current_ctc != null ? String(row.current_ctc) : null,
+    expectedCtc: row.expected_ctc != null ? String(row.expected_ctc) : null,
+    relocateToMohali: row.relocate_to_mohali != null ? String(row.relocate_to_mohali) : null,
+    submittedAt,
+    recordingUrl: row.recording_url != null ? String(row.recording_url) : null,
+  };
+}
+
 export async function getCandidates(): Promise<{ data: CandidateAdmin[]; error: string | null }> {
   const sql = getSql();
   if (!sql) return { data: [], error: "Database not configured." };
@@ -112,6 +142,40 @@ export async function getCandidateById(id: string): Promise<{ data: CandidateAdm
   } catch (err) {
     console.error("getCandidateById:", err);
     return { data: null, error: "Failed to fetch candidate." };
+  }
+}
+
+export async function getCandidatePreScreensById(
+  candidateId: string
+): Promise<{ data: PreScreenAdminRow[]; error: string | null }> {
+  const sql = getSql();
+  if (!sql) return { data: [], error: "Database not configured." };
+  try {
+    let rows: Record<string, unknown>[] = [];
+    try {
+      rows = await sql`
+        SELECT id, token, experience_years, current_ctc, expected_ctc, relocate_to_mohali, submitted_at, recording_url
+        FROM pre_screens_with_recording
+        WHERE candidate_id = ${candidateId}
+        ORDER BY submitted_at DESC
+      `;
+    } catch {
+      const candidateRows = await sql`SELECT token FROM candidates WHERE id = ${candidateId} LIMIT 1`;
+      const token = candidateRows[0]?.token;
+      if (!token) return { data: [], error: null };
+      rows = await sql`
+        SELECT ps.id, ps.token, ps.experience_years, ps.current_ctc, ps.expected_ctc, ps.relocate_to_mohali, ps.submitted_at, c."Interview_Link" AS recording_url
+        FROM pre_screens ps
+        LEFT JOIN candidates c ON c.token = ps.token
+        WHERE ps.token = ${token}
+        ORDER BY ps.submitted_at DESC
+      `;
+    }
+    const data = rows.map((r) => toPreScreenAdminRow(r)).filter(Boolean) as PreScreenAdminRow[];
+    return { data, error: null };
+  } catch (err) {
+    console.error("getCandidatePreScreensById:", err);
+    return { data: [], error: "Failed to fetch pre-screening data." };
   }
 }
 
@@ -211,6 +275,8 @@ export async function createCandidateMock(payload: {
         matchedRoleId: matchedRoleId?.trim() ?? null,
         matchPercentage: typeof matchPercentage === "number" ? matchPercentage : null,
         matchReasoning: matchReasoning?.trim() ?? null,
+        interviewLink: null,
+        resumeLink: null,
       },
       error: null,
     };

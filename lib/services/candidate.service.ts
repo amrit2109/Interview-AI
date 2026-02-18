@@ -18,6 +18,7 @@ export interface CreateCandidateWithInvitePayload {
   matchedRoleId?: string;
   matchPercentage?: number;
   matchReasoning?: string;
+  resumeLink?: string;
 }
 
 export interface CandidateWithToken {
@@ -108,6 +109,7 @@ export async function createCandidateWithInvite(
     matchedRoleId,
     matchPercentage,
     matchReasoning,
+    resumeLink,
   } = payload;
 
   if (!name?.trim()) return { data: null, error: "Name is required." };
@@ -133,12 +135,14 @@ export async function createCandidateWithInvite(
 
       const atsVal = typeof atsScore === "number" ? Math.round(atsScore) : null;
 
+      const resumeLinkVal = resumeLink?.trim() || null;
       const inserted = await sql`
         INSERT INTO candidates (
           name, email, phone, position, ats_score, interview_score, status,
           interview_date, token, token_created_at, token_expires_at,
           skills, experience_years, education, ats_explanation,
-          matched_role_id, match_percentage, match_reasoning
+          matched_role_id, match_percentage, match_reasoning,
+          resume_link, resume_uploaded_at
         )
         VALUES (
           ${name.trim()}, ${email.trim().toLowerCase()}, ${phone?.trim() ?? null},
@@ -147,7 +151,8 @@ export async function createCandidateWithInvite(
           ${skills?.trim() ?? null}, ${typeof experienceYears === "number" ? experienceYears : null},
           ${education?.trim() ?? null}, ${atsExplanation?.trim() ?? null},
           ${matchedRoleId?.trim() ?? null}, ${typeof matchPercentage === "number" ? matchPercentage : null},
-          ${matchReasoning?.trim() ?? null}
+          ${matchReasoning?.trim() ?? null},
+          ${resumeLinkVal}, ${resumeLinkVal ? new Date() : null}
         )
         RETURNING id
       `;
