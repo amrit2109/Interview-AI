@@ -1,12 +1,14 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { loginAdmin } from "@/lib/mock-api";
+import { loginAdmin } from "@/lib/api";
 import { ADMIN_SESSION_COOKIE, signToken } from "@/lib/auth";
+import { getEnv } from "@/lib/env";
 
 /**
- * Server action: validate credentials, set signed session cookie, redirect to dashboard.
+ * Server action: validate credentials, set signed session cookie.
+ * Returns success/error; client navigates to /admin on success to avoid
+ * Next.js 303 redirect cookie override (issue #61611).
  * @param {FormData} formData
  */
 export async function handleLogin(formData) {
@@ -19,19 +21,19 @@ export async function handleLogin(formData) {
 
   const { data, error } = await loginAdmin(email, password);
 
-  if (error) {
-    return { error };
+  if (error || !data) {
+    return { error: error ?? "Invalid credentials." };
   }
 
   const token = await signToken({ sub: String(data.id) });
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: getEnv().NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 60 * 60 * 24,
     path: "/",
   });
 
-  redirect("/admin");
+  return { success: true };
 }

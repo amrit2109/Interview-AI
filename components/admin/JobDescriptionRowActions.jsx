@@ -33,7 +33,7 @@ export function OpeningsStepper({ id, openings }) {
     if (result.ok) {
       router.refresh();
     } else {
-      setError(result.error_message ?? "Update failed.");
+      setError(result.error ?? "Update failed.");
     }
   }
 

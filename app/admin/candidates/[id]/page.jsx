@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getCandidateById } from "@/lib/mock-api";
+import { getCandidateById } from "@/lib/api";
 import { format } from "@/lib/date-utils";
 import { ArrowLeftIcon, FileTextIcon } from "lucide-react";
 

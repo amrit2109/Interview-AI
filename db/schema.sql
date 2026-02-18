@@ -60,7 +60,11 @@ CREATE TABLE IF NOT EXISTS candidates (
   ats_explanation TEXT,
   matched_role_id TEXT REFERENCES job_descriptions(id),
   match_percentage INTEGER,
-  match_reasoning TEXT
+  match_reasoning TEXT,
+  "Interview_Link" TEXT,
+  interview_recording_status TEXT,
+  interview_recording_failed_reason TEXT,
+  interview_recording_uploaded_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_candidates_token ON candidates(token);

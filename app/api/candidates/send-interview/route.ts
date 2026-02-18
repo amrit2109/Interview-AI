@@ -39,19 +39,6 @@ function parseBody(body: unknown): SendInterviewRequestBody | null {
 }
 
 export async function POST(request: NextRequest) {
-  // #region agent log
-  fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "send-interview/route.ts:POST",
-      message: "API entry",
-      data: { step: "entry" },
-      timestamp: Date.now(),
-      hypothesisId: "H5",
-    }),
-  }).catch(() => {});
-  // #endregion
   try {
     const body = await request.json();
     const payload = parseBody(body);
@@ -63,19 +50,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await sendInterviewInvite(payload);
-    // #region agent log
-    fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "send-interview/route.ts:POST",
-        message: "sendInterviewInvite result",
-        data: { hasData: !!data, error, errorMsg: error?.slice(0, 200) },
-        timestamp: Date.now(),
-        hypothesisId: "H5",
-      }),
-    }).catch(() => {});
-    // #endregion
 
     if (error && !data) {
       const status = error.includes("required") ? 400 : 500;
@@ -105,23 +79,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (err) {
-    // #region agent log
-    fetch("http://127.0.0.1:7245/ingest/a062950e-dd39-4c19-986f-667c51ac69a7", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "send-interview/route.ts:catch",
-        message: "API catch",
-        data: {
-          errName: err instanceof Error ? err.name : "unknown",
-          errMsg: err instanceof Error ? err.message : String(err),
-          errStack: err instanceof Error ? err.stack?.slice(0, 500) : undefined,
-        },
-        timestamp: Date.now(),
-        hypothesisId: "H5",
-      }),
-    }).catch(() => {});
-    // #endregion
     console.error("send-interview:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to send interview invite." },

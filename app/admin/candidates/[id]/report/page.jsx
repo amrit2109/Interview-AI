@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getCandidateById, getCandidateReport } from "@/lib/mock-api";
+import { getCandidateById, getCandidateReport } from "@/lib/api";
 import { ArrowLeftIcon, ThumbsUpIcon, AlertTriangleIcon } from "lucide-react";
 
 async function CandidateReportContent({ id }) {

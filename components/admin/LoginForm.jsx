@@ -41,6 +41,9 @@ export function LoginForm() {
 
     if (result?.error) {
       setError(result.error);
+    } else {
+      // No error = success; use full navigation so cookie is sent reliably
+      window.location.href = "/admin";
     }
   };
 

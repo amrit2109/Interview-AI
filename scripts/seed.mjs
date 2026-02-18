@@ -89,7 +89,7 @@ async function seed() {
   const candidates = [
     ["1", "Jane Doe", "jane.doe@example.com", "+91 98765 43210", "Frontend Developer", 78, 85, "completed", "2025-02-10", "demo123", createdDemo, expiresDemo],
     ["2", "John Smith", "john.smith@example.com", "+91 98123 45678", "Full Stack Engineer", 82, null, "in_progress", "2025-02-11", "fe789", createdDemo, expiresDemo],
-    ["3", "Sarah Wilson", "sarah.wilson@example.com", "+91 98234 56789", "Frontend Developer", 65, 72, "completed", "2025-02-09", "demo123", createdDemo, expiresDemo],
+    ["3", "Sarah Wilson", "sarah.wilson@example.com", "+91 98234 56789", "Frontend Developer", 65, 72, "completed", "2025-02-09", "demo456", createdDemo, expiresDemo],
     ["4", "Michael Chen", "michael.chen@example.com", "+91 97654 32109", "Backend Developer", 91, null, "pending", null, null, null, null],
   ];
   for (const [id, name, email, phone, position, atsScore, interviewScore, status, interviewDate, token, tokenCreatedAt, tokenExpiresAt] of candidates) {
@@ -121,5 +121,5 @@ async function seed() {
 
 seed().catch((err) => {
   console.error(err);
-  process.exit(1);l
+  process.exit(1);
 });
