@@ -7,6 +7,13 @@ const DEFAULT_INSTRUCTIONS = [
   "Have your resume handy for reference.",
 ];
 
+export interface CandidateDisplay {
+  name: string;
+  email: string;
+  position: string;
+  experienceYears: number | null;
+}
+
 export interface InterviewDisplay {
   jobTitle: string;
   company: string;
@@ -17,6 +24,7 @@ export interface InterviewDisplay {
   instructions: string[];
   expiresAt: string;
   questionCount: number;
+  candidate: CandidateDisplay | null;
 }
 
 export interface InterviewTokenGuardResult {
@@ -43,6 +51,12 @@ export async function getInterviewDisplayByToken(
   }
 
   const c = result.candidate;
+  const candidateInfo: CandidateDisplay = {
+    name: c.name,
+    email: c.email,
+    position: c.position ?? "Unassigned",
+    experienceYears: c.experienceYears ?? null,
+  };
   const display: InterviewDisplay = {
     jobTitle: c.position ?? "Interview",
     company: "Orion Tech",
@@ -53,6 +67,7 @@ export async function getInterviewDisplayByToken(
     instructions: DEFAULT_INSTRUCTIONS,
     expiresAt: c.tokenExpiresAt instanceof Date ? c.tokenExpiresAt.toISOString() : String(c.tokenExpiresAt),
     questionCount: 5,
+    candidate: candidateInfo,
   };
 
   return { data: display, error: null };

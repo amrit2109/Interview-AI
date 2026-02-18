@@ -11,15 +11,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import {
   BriefcaseIcon,
   BuildingIcon,
   ClockIcon,
-  MicIcon,
+  MailIcon,
   PlayIcon,
   CheckCircleIcon,
   AlertCircleIcon,
+  UserIcon,
   XCircleIcon,
 } from "lucide-react";
 
@@ -81,6 +89,60 @@ export function InterviewEntryCard({ interview, token }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {interview.candidate && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg border border-input bg-muted/30 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50"
+                aria-label="View your information"
+              >
+                <UserIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="text-muted-foreground">Logged in as</span>
+                <span className="font-medium text-foreground">{interview.candidate.name}</span>
+              </button>
+            </DialogTrigger>
+            <DialogContent size="default" className="gap-4">
+              <DialogHeader>
+                <DialogTitle>Your information</DialogTitle>
+              </DialogHeader>
+              <dl className="grid gap-3 text-sm">
+                <div className="flex items-start gap-3">
+                  <UserIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <dt className="text-muted-foreground">Name</dt>
+                    <dd className="font-medium">{interview.candidate.name}</dd>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <BriefcaseIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <dt className="text-muted-foreground">Job role</dt>
+                    <dd className="font-medium">{interview.candidate.position}</dd>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <ClockIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <dt className="text-muted-foreground">Experience</dt>
+                    <dd className="font-medium">
+                      {interview.candidate.experienceYears != null
+                        ? `${interview.candidate.experienceYears} years`
+                        : "Not specified"}
+                    </dd>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <MailIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <dt className="text-muted-foreground">Email</dt>
+                    <dd className="font-medium">{interview.candidate.email}</dd>
+                  </div>
+                </div>
+              </dl>
+            </DialogContent>
+          </Dialog>
+        )}
         <div>
           <p className="text-sm font-medium text-foreground">Interview Type</p>
           <p className="text-sm text-muted-foreground">{interview.interviewType}</p>

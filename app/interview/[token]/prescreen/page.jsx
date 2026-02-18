@@ -37,7 +37,7 @@ async function PreScreenContent({ token }) {
           Pre-screening • Round 1
         </p>
       </header>
-      <PreScreeningSteps interview={data} token={token} />
+      <PreScreeningSteps interview={data} candidate={data.candidate} token={token} />
     </div>
   );
 }

@@ -266,3 +266,120 @@ export async function getCandidateByInterviewToken(
     return { valid: false, error: "Invalid or expired interview link." };
   }
 }
+
+export interface MarkRecordingFailedParams {
+  token: string;
+  reason: string;
+}
+
+export interface CompleteRecordingParams {
+  token: string;
+  interviewLink: string;
+}
+
+export interface RecordingUpdateResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Mark interview recording as failed. Updates exactly one candidate by token.
+ */
+export async function markInterviewRecordingFailed({
+  token,
+  reason,
+}: MarkRecordingFailedParams): Promise<RecordingUpdateResult> {
+  if (!sql) return { ok: false, error: "Database not configured." };
+  if (!token?.trim()) return { ok: false, error: "Invalid token." };
+
+  const validation = await getCandidateByInterviewToken(token.trim());
+  if (!validation.valid || !validation.candidate) {
+    return { ok: false, error: validation.error ?? "Invalid or expired interview link." };
+  }
+
+  try {
+    const result = await sql`
+      UPDATE candidates
+      SET interview_recording_status = 'failed',
+          interview_recording_failed_reason = ${reason ?? "Unknown"}
+      WHERE token = ${token.trim()}
+      RETURNING id
+    `;
+    if (!result?.length) return { ok: false, error: "Candidate not found." };
+    return { ok: true };
+  } catch (err) {
+    console.error("markInterviewRecordingFailed:", err);
+    return { ok: false, error: "Failed to update recording status." };
+  }
+}
+
+/**
+ * Complete interview recording and persist uploaded video URL.
+ * Updates exactly one candidate by token. Only updates if upload succeeded.
+ */
+export async function completeInterviewRecording({
+  token,
+  interviewLink,
+}: CompleteRecordingParams): Promise<RecordingUpdateResult> {
+  if (!sql) return { ok: false, error: "Database not configured." };
+  if (!token?.trim()) return { ok: false, error: "Invalid token." };
+  if (!interviewLink?.trim()) return { ok: false, error: "Interview link URL is required." };
+
+  const validation = await getCandidateByInterviewToken(token.trim());
+  if (!validation.valid || !validation.candidate) {
+    return { ok: false, error: validation.error ?? "Invalid or expired interview link." };
+  }
+
+  try {
+    const result = await sql`
+      UPDATE candidates
+      SET "Interview_Link" = ${interviewLink.trim()},
+          interview_recording_status = 'completed',
+          interview_recording_failed_reason = NULL,
+          interview_recording_uploaded_at = NOW(),
+          status = 'completed'
+      WHERE token = ${token.trim()}
+      RETURNING id
+    `;
+    if (!result?.length) return { ok: false, error: "Candidate not found." };
+    return { ok: true };
+  } catch (err) {
+    console.error("completeInterviewRecording:", err);
+    const message = err instanceof Error ? err.message : "Failed to save recording URL.";
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Complete interview without recording (bypass for testing).
+ * Updates status and recording fields; Interview_Link remains null.
+ */
+export async function completeInterviewWithoutRecording(
+  token: string
+): Promise<RecordingUpdateResult> {
+  if (!sql) return { ok: false, error: "Database not configured." };
+  if (!token?.trim()) return { ok: false, error: "Invalid token." };
+
+  const validation = await getCandidateByInterviewToken(token.trim());
+  if (!validation.valid || !validation.candidate) {
+    return { ok: false, error: validation.error ?? "Invalid or expired interview link." };
+  }
+
+  try {
+    const result = await sql`
+      UPDATE candidates
+      SET "Interview_Link" = NULL,
+          interview_recording_status = 'completed',
+          interview_recording_failed_reason = NULL,
+          interview_recording_uploaded_at = NOW(),
+          status = 'completed'
+      WHERE token = ${token.trim()}
+      RETURNING id
+    `;
+    if (!result?.length) return { ok: false, error: "Candidate not found." };
+    return { ok: true };
+  } catch (err) {
+    console.error("completeInterviewWithoutRecording:", err);
+    return { ok: false, error: "Failed to complete interview." };
+  }
+}
