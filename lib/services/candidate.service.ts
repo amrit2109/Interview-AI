@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import {
   generateInterviewToken,
   getTokenTimestamps,
@@ -92,6 +92,7 @@ function toCandidateWithToken(row: {
 export async function createCandidateWithInvite(
   payload: CreateCandidateWithInvitePayload
 ): Promise<{ data: CandidateWithToken | null; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: null, error: "Database not configured." };
 
   const {
@@ -111,6 +112,15 @@ export async function createCandidateWithInvite(
 
   if (!name?.trim()) return { data: null, error: "Name is required." };
   if (!email?.trim()) return { data: null, error: "Email is required." };
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await sql`SELECT id, token, token_expires_at FROM candidates WHERE LOWER(email) = ${normalizedEmail} AND token IS NOT NULL ORDER BY token_created_at DESC NULLS LAST LIMIT 1`;
+  if (existing.length > 0) {
+    const row = existing[0] as { token: string | null; token_expires_at: Date | string | null };
+    if (row.token && !isTokenExpired(row.token_expires_at)) {
+      return { data: null, error: "An active interview link already exists for this email." };
+    }
+  }
 
   const maxRetries = 5;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -174,6 +184,7 @@ export async function createCandidateWithInvite(
 export async function getCandidateByInterviewToken(
   token: string
 ): Promise<TokenValidationResult> {
+  const sql = getSql();
   if (!sql) return { valid: false, error: "Database not configured." };
   if (!token?.trim()) return { valid: false, error: "Invalid or expired interview link." };
 
@@ -219,6 +230,7 @@ export async function getCandidateByInterviewToken(
  * Check if a candidate already has a completed recording (for idempotent upload retries).
  */
 export async function isRecordingAlreadyCompleted(token: string): Promise<boolean> {
+  const sql = getSql();
   if (!sql) return false;
   if (!token?.trim()) return false;
   try {
@@ -255,6 +267,7 @@ export async function markInterviewRecordingFailed({
   token,
   reason,
 }: MarkRecordingFailedParams): Promise<RecordingUpdateResult> {
+  const sql = getSql();
   if (!sql) return { ok: false, error: "Database not configured." };
   if (!token?.trim()) return { ok: false, error: "Invalid token." };
 
@@ -287,6 +300,7 @@ export async function completeInterviewRecording({
   token,
   interviewLink,
 }: CompleteRecordingParams): Promise<RecordingUpdateResult> {
+  const sql = getSql();
   if (!sql) return { ok: false, error: "Database not configured." };
   if (!token?.trim()) return { ok: false, error: "Invalid token." };
   if (!interviewLink?.trim()) return { ok: false, error: "Interview link URL is required." };
@@ -323,6 +337,7 @@ export async function completeInterviewRecording({
 export async function completeInterviewWithoutRecording(
   token: string
 ): Promise<RecordingUpdateResult> {
+  const sql = getSql();
   if (!sql) return { ok: false, error: "Database not configured." };
   if (!token?.trim()) return { ok: false, error: "Invalid token." };
 

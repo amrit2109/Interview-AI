@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { getCandidateByInterviewToken } from "./candidate.service";
 
 export interface PreScreenData {
@@ -19,6 +19,7 @@ export async function submitPreScreen(
     relocateToMohali?: string;
   }
 ): Promise<{ data: PreScreenData | null; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: null, error: "Database not configured." };
   try {
     const { valid, error: tokenError } = await getCandidateByInterviewToken(token);
@@ -57,6 +58,7 @@ export async function submitPreScreen(
 }
 
 export async function getPreScreen(token: string): Promise<{ data: PreScreenData | null; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: null, error: "Database not configured." };
   try {
     const { valid } = await getCandidateByInterviewToken(token);

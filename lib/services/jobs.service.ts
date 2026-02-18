@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 
 export interface JobDescription {
   id: string;
@@ -18,6 +18,7 @@ function toJobDescription(row: Record<string, unknown> | null): JobDescription |
 }
 
 export async function getJobDescriptions(): Promise<{ data: JobDescription[]; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: [], error: "Database not configured." };
   try {
     const rows = await sql`SELECT * FROM job_descriptions ORDER BY id`;
@@ -29,6 +30,7 @@ export async function getJobDescriptions(): Promise<{ data: JobDescription[]; er
 }
 
 export async function getActiveJobDescriptions(): Promise<{ data: JobDescription[]; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: [], error: "Database not configured." };
   try {
     const rows = await sql`SELECT * FROM job_descriptions WHERE openings > 0 ORDER BY id`;
@@ -44,6 +46,7 @@ export async function createJobDescription(payload: {
   description?: string;
   openings?: number;
 }): Promise<{ data: JobDescription | null; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: null, error: "Database not configured." };
   const { jobName, description, openings } = payload ?? {};
   if (!jobName?.trim()) return { data: null, error: "Job name is required." };
@@ -87,6 +90,7 @@ export async function updateJobDescriptionOpeningsById({
   job_description_id: string | number;
   openings: number;
 }): Promise<{ ok: boolean; data?: JobDescription; error_message?: string }> {
+  const sql = getSql();
   if (!sql) return { ok: false, error_message: "Database not configured." };
   const id = job_description_id == null ? null : String(job_description_id).trim();
   if (!id) return { ok: false, error_message: "Job description ID is required." };
@@ -113,6 +117,7 @@ export async function deleteJobDescriptionById({
 }: {
   job_description_id: string | number;
 }): Promise<{ ok: boolean; deleted_id?: string; error_message?: string }> {
+  const sql = getSql();
   if (!sql) return { ok: false, error_message: "Database not configured." };
   const id = job_description_id == null ? null : String(job_description_id).trim();
   if (!id) return { ok: false, error_message: "Job description ID is required." };

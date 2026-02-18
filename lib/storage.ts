@@ -37,11 +37,20 @@ function getStorageConfig(): {
   if (!bucket || !accessKeyId || !secretAccessKey) {
     return { client: null, bucket: undefined, region, publicBaseUrl };
   }
+  const normalizedEndpoint = endpoint
+    ? (() => {
+        let u = endpoint.replace(/\/$/, "");
+        if (bucket && u.endsWith("/" + bucket)) {
+          u = u.slice(0, -(bucket.length + 1));
+        }
+        return u || undefined;
+      })()
+    : undefined;
   const client = new S3Client({
     region,
-    ...(endpoint && { endpoint }),
+    ...(normalizedEndpoint && { endpoint: normalizedEndpoint }),
     credentials: { accessKeyId, secretAccessKey },
-    ...(endpoint?.startsWith("https://") && { forcePathStyle: false }),
+    ...(normalizedEndpoint?.startsWith("https://") && { forcePathStyle: false }),
     requestHandler: new NodeHttpHandler({
       httpsAgent,
       connectionTimeout: 10_000,

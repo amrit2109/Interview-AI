@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { getJobDescriptions } from "./jobs.service";
 
 export interface CandidateAdmin {
@@ -91,6 +91,7 @@ function toReport(row: Record<string, unknown> | null): Report | null {
 }
 
 export async function getCandidates(): Promise<{ data: CandidateAdmin[]; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: [], error: "Database not configured." };
   try {
     const rows = await sql`SELECT * FROM candidates ORDER BY interview_date DESC NULLS LAST, id`;
@@ -102,6 +103,7 @@ export async function getCandidates(): Promise<{ data: CandidateAdmin[]; error: 
 }
 
 export async function getCandidateById(id: string): Promise<{ data: CandidateAdmin | null; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: null, error: "Database not configured." };
   try {
     const rows = await sql`SELECT * FROM candidates WHERE id = ${id} LIMIT 1`;
@@ -118,6 +120,7 @@ export async function deleteCandidateById({
 }: {
   candidate_id: string | number;
 }): Promise<{ ok: boolean; deleted_id?: string; error_message?: string }> {
+  const sql = getSql();
   if (!sql) return { ok: false, error_message: "Database not configured." };
   const id = candidate_id == null ? null : String(candidate_id).trim();
   if (!id) return { ok: false, error_message: "Candidate ID is required." };
@@ -132,6 +135,7 @@ export async function deleteCandidateById({
 }
 
 export async function getCandidateReport(id: string): Promise<{ data: Report | null; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: null, error: "Database not configured." };
   try {
     const rows = await sql`SELECT * FROM reports WHERE candidate_id = ${id} LIMIT 1`;
@@ -160,6 +164,7 @@ export async function createCandidateMock(payload: {
   matchPercentage?: number;
   matchReasoning?: string;
 }): Promise<{ data: CandidateAdmin | null; error: string | null }> {
+  const sql = getSql();
   if (!sql) return { data: null, error: "Database not configured." };
   const {
     name,
