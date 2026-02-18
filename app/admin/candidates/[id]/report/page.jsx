@@ -35,6 +35,23 @@ async function CandidateReportContent({ id }) {
         </Button>
       </div>
 
+      {candidate.interviewLink && (
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Interview Recording</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <video
+              src={candidate.interviewLink}
+              controls
+              className="w-full max-w-2xl rounded-lg border bg-muted"
+            >
+              Your browser does not support the video tag.
+            </video>
+          </CardContent>
+        </Card>
+      )}
+
       <Card size="sm">
         <CardHeader>
           <CardTitle className="text-xl">Hiring Report</CardTitle>

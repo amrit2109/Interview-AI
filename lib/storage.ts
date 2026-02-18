@@ -37,11 +37,20 @@ function getStorageConfig(): {
   if (!bucket || !accessKeyId || !secretAccessKey) {
     return { client: null, bucket: undefined, region, publicBaseUrl };
   }
+  const normalizedEndpoint = endpoint
+    ? (() => {
+        let u = endpoint.replace(/\/$/, "");
+        if (bucket && u.endsWith("/" + bucket)) {
+          u = u.slice(0, -(bucket.length + 1));
+        }
+        return u || undefined;
+      })()
+    : undefined;
   const client = new S3Client({
     region,
-    ...(endpoint && { endpoint }),
+    ...(normalizedEndpoint && { endpoint: normalizedEndpoint }),
     credentials: { accessKeyId, secretAccessKey },
-    ...(endpoint?.startsWith("https://") && { forcePathStyle: false }),
+    ...(normalizedEndpoint?.startsWith("https://") && { forcePathStyle: false }),
     requestHandler: new NodeHttpHandler({
       httpsAgent,
       connectionTimeout: 10_000,
@@ -67,6 +76,75 @@ export function getRecordingObjectKey(token: string): string {
 export function getRecordingPrefixForToken(token: string): string {
   const safe = token.replace(/[^a-zA-Z0-9_-]/g, "_");
   return `recordings/${safe}/`;
+}
+
+/** Sanitize string for use in object key path (resumes folder). */
+function sanitizeForKey(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "unknown";
+}
+
+/** Allowed MIME types and extensions for resume uploads. Reuse in API validation. */
+export const RESUME_ALLOWED_TYPES = [
+  "application/pdf",
+  "text/plain",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+] as const;
+export const RESUME_ALLOWED_EXTENSIONS = [".pdf", ".txt", ".doc", ".docx"] as const;
+
+/** Extension from content type for resume files. */
+const RESUME_EXT_MAP: Record<string, string> = {
+  "application/pdf": "pdf",
+  "text/plain": "txt",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+};
+
+export function getResumeObjectKey(
+  emailOrId: string,
+  contentType: string
+): string {
+  const safe = sanitizeForKey(emailOrId);
+  const ext = RESUME_EXT_MAP[contentType] ?? "pdf";
+  const ts = Date.now();
+  return `resumes/${safe}/${ts}.${ext}`;
+}
+
+/**
+ * Upload resume body from server to R2 under resumes/ prefix.
+ */
+export async function uploadResumeFromServer(
+  emailOrId: string,
+  body: ArrayBuffer | Buffer | Uint8Array,
+  contentType: string
+): Promise<{ data: { objectKey: string; finalUrl: string } | null; error: string | null }> {
+  if (!client || !bucket) {
+    return {
+      data: null,
+      error: "Storage not configured. Set S3_* environment variables.",
+    };
+  }
+  const objectKey = getResumeObjectKey(emailOrId, contentType);
+  const finalUrl = publicBaseUrl
+    ? `${publicBaseUrl.replace(/\/$/, "")}/${objectKey}`
+    : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        Body: body instanceof ArrayBuffer ? new Uint8Array(body) : body,
+        ContentType: contentType,
+      })
+    );
+    return { data: { objectKey, finalUrl }, error: null };
+  } catch (err) {
+    console.error("uploadResumeFromServer:", err);
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : "Upload failed.",
+    };
+  }
 }
 
 export interface PresignedUploadResult {

@@ -161,6 +161,23 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
     }
     setIsSubmitting(true);
     try {
+      let resumeLink = null;
+      if (file) {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", file);
+        uploadFormData.append("email", trimmedEmail);
+        const uploadRes = await fetch("/api/candidates/upload-resume", {
+          method: "POST",
+          body: uploadFormData,
+        });
+        const uploadJson = await uploadRes.json();
+        if (!uploadRes.ok) {
+          setError(uploadJson?.error ?? "Failed to upload resume.");
+          return;
+        }
+        resumeLink = uploadJson?.resumeLink ?? null;
+      }
+
       const matchedJd = jobDescriptions.find((jd) => jd.jobName === position);
       const res = await fetch("/api/candidates/send-interview", {
         method: "POST",
@@ -178,6 +195,7 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
           matchedRoleId: matchedJd?.id ?? parsed?.match?.roleId ?? undefined,
           matchPercentage: parsed?.match?.percentage ?? undefined,
           matchReasoning: parsed?.match?.reasoning || undefined,
+          resumeLink: resumeLink || undefined,
         }),
       });
       const json = await res.json();

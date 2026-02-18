@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 
 export interface InterviewQuestion {
   id: number;
@@ -9,6 +9,7 @@ export async function getInterviewQuestions(): Promise<{
   data: InterviewQuestion[];
   error: string | null;
 }> {
+  const sql = getSql();
   if (!sql) return { data: [], error: "Database not configured." };
   try {
     const rows = await sql`SELECT id, text FROM questions ORDER BY id`;

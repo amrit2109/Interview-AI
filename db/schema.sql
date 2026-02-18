@@ -64,7 +64,9 @@ CREATE TABLE IF NOT EXISTS candidates (
   "Interview_Link" TEXT,
   interview_recording_status TEXT,
   interview_recording_failed_reason TEXT,
-  interview_recording_uploaded_at TIMESTAMPTZ
+  interview_recording_uploaded_at TIMESTAMPTZ,
+  resume_link TEXT,
+  resume_uploaded_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_candidates_token ON candidates(token);

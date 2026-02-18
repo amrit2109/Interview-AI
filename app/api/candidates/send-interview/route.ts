@@ -14,6 +14,7 @@ interface SendInterviewRequestBody {
   matchedRoleId?: string;
   matchPercentage?: number;
   matchReasoning?: string;
+  resumeLink?: string;
 }
 
 function parseBody(body: unknown): SendInterviewRequestBody | null {
@@ -35,6 +36,7 @@ function parseBody(body: unknown): SendInterviewRequestBody | null {
     matchedRoleId: typeof o.matchedRoleId === "string" ? o.matchedRoleId : undefined,
     matchPercentage: typeof o.matchPercentage === "number" ? o.matchPercentage : undefined,
     matchReasoning: typeof o.matchReasoning === "string" ? o.matchReasoning : undefined,
+    resumeLink: typeof o.resumeLink === "string" ? o.resumeLink : undefined,
   };
 }
 
