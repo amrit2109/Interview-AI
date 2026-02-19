@@ -29,6 +29,21 @@ export async function getJobDescriptions(): Promise<{ data: JobDescription[]; er
   }
 }
 
+export async function getJobDescriptionById(
+  id: string
+): Promise<{ data: JobDescription | null; error: string | null }> {
+  const sql = getSql();
+  if (!sql) return { data: null, error: "Database not configured." };
+  try {
+    const rows = await sql`SELECT * FROM job_descriptions WHERE id = ${id} LIMIT 1`;
+    const row = rows[0];
+    return { data: row ? toJobDescription(row) : null, error: null };
+  } catch (err) {
+    console.error("getJobDescriptionById:", err);
+    return { data: null, error: "Failed to fetch job description." };
+  }
+}
+
 export async function getActiveJobDescriptions(): Promise<{ data: JobDescription[]; error: string | null }> {
   const sql = getSql();
   if (!sql) return { data: [], error: "Database not configured." };

@@ -5,6 +5,9 @@ import {
   isRecordingAlreadyCompleted,
 } from "@/lib/services/candidate.service";
 import { createPresignedUploadUrl } from "@/lib/storage";
+import { submitSession } from "@/lib/services/interview-session.service";
+import { runPostSubmitEvaluation } from "@/lib/services/post-submit-evaluation.service";
+import { logAuditEvent } from "@/lib/utils/audit-log";
 
 const MAX_BODY_BYTES = 512 * 1024 * 1024; // 512 MB
 
@@ -106,6 +109,13 @@ export async function POST(
       { status: 500 }
     );
   }
+
+  await submitSession(token.trim(), finalUrl);
+  logAuditEvent({ event: "session_submitted", token: token.trim() });
+
+  runPostSubmitEvaluation(token.trim()).catch((err) => {
+    console.error("post-submit evaluation failed:", err);
+  });
 
   return NextResponse.json({ ok: true });
 }

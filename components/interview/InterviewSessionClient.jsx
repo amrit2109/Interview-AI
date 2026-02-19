@@ -28,10 +28,18 @@ export function InterviewSessionClient({ token, interview, questions }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [tabWarning, setTabWarning] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answerText, setAnswerText] = useState("");
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [isAdvancing, setIsAdvancing] = useState(false);
   const failSentRef = useRef(false);
 
-  const questionList = questions ?? [];
-  const currentIndex = 0;
+  const questionList = Array.isArray(questions)
+    ? questions.map((q) => ({
+        id: q.id ?? String(q.id),
+        text: typeof q.text === "string" ? q.text : q.question ?? "",
+      }))
+    : [];
   const currentQuestion = questionList[currentIndex];
 
   const sendFail = useCallback(
@@ -50,6 +58,14 @@ export function InterviewSessionClient({ token, interview, questions }) {
     },
     [token]
   );
+
+  useEffect(() => {
+    if (gatePassed && !sessionStarted && questionList.length > 0) {
+      fetch(`/api/interview/${token}/session/start`, { method: "POST" })
+        .then(() => setSessionStarted(true))
+        .catch(() => {});
+    }
+  }, [gatePassed, sessionStarted, token, questionList.length]);
 
   useEffect(() => {
     const unsub = subscribe((ev) => {
@@ -89,8 +105,43 @@ export function InterviewSessionClient({ token, interview, questions }) {
     };
   }, [token]);
 
+  const recordTurnAndAdvance = useCallback(
+    async (isLast) => {
+      if (!currentQuestion || isAdvancing) return;
+      setIsAdvancing(true);
+      try {
+        await fetch(`/api/interview/${token}/session/next`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            questionId: currentQuestion.id,
+            questionText: currentQuestion.text,
+            answer: answerText.trim() || null,
+            unanswered: !answerText.trim(),
+            totalQuestions: questionList.length,
+          }),
+        });
+        setAnswerText("");
+        if (!isLast) setCurrentIndex((i) => i + 1);
+      } finally {
+        setIsAdvancing(false);
+      }
+    },
+    [token, currentQuestion, answerText, questionList.length, isAdvancing]
+  );
+
+  const handleNext = async () => {
+    const isLast = currentIndex >= questionList.length - 1;
+    await recordTurnAndAdvance(isLast);
+  };
+
   const handleComplete = async () => {
     if (violated || isUploading) return;
+
+    const isLast = currentIndex >= questionList.length - 1;
+    if (isLast && currentQuestion) {
+      await recordTurnAndAdvance(true);
+    }
 
     setIsUploading(true);
     setUploadError("");
@@ -192,7 +243,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
         </div>
         <h1 className="mt-2 text-xl font-bold sm:text-2xl">{interview.jobTitle}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Question {currentIndex + 1} of {questionList.length}
+          Question {Math.min(currentIndex + 1, questionList.length)} of {questionList.length || 1}
         </p>
       </header>
 
@@ -209,6 +260,18 @@ export function InterviewSessionClient({ token, interview, questions }) {
               <p className="text-sm font-medium text-muted-foreground">Question</p>
               <p className="mt-2 text-lg">{currentQuestion?.text ?? "No questions available."}</p>
             </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-2">
+                Your answer (optional – voice recording in a later phase)
+              </p>
+              <textarea
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Type your answer here..."
+                value={answerText}
+                onChange={(e) => setAnswerText(e.target.value)}
+                disabled={isUploading || isAdvancing}
+              />
+            </div>
             <Separator />
             <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center">
               <p className="text-sm text-muted-foreground">
@@ -224,7 +287,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
               <Button
                 variant="outline"
-                disabled={isUploading}
+                disabled={isUploading || isAdvancing}
                 onClick={() => {
                   terminateRecording();
                   sendFail("user_navigated_back");
@@ -233,14 +296,25 @@ export function InterviewSessionClient({ token, interview, questions }) {
               >
                 Back
               </Button>
-              <Button
-                onClick={handleComplete}
-                disabled={isUploading}
-                data-icon="inline-end"
-              >
-                {isUploading ? "Uploading…" : "Submit Interview"}
-                <ArrowRightIcon className="size-4" />
-              </Button>
+              {questionList.length > 0 && currentIndex < questionList.length - 1 ? (
+                <Button
+                  onClick={handleNext}
+                  disabled={isUploading || isAdvancing}
+                  data-icon="inline-end"
+                >
+                  {isAdvancing ? "Saving…" : "Next"}
+                  <ArrowRightIcon className="size-4" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleComplete}
+                  disabled={isUploading || isAdvancing}
+                  data-icon="inline-end"
+                >
+                  {isUploading ? "Uploading…" : "Submit Interview"}
+                  <ArrowRightIcon className="size-4" />
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

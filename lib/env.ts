@@ -24,6 +24,7 @@ const schema = z.object({
   GOOGLE_GEMINI_API_KEY: z.string().optional(),
   APP_BASE_URL: z.string().optional(),
   VERCEL_URL: z.string().optional(),
+  USE_LEGACY_INTERVIEW_QUESTIONS: z.string().optional(),
 });
 
 let cached: z.infer<typeof schema> | null = null;
