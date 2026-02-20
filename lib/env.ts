@@ -22,6 +22,9 @@ const schema = z.object({
   S3_REGION: z.string().optional(),
   S3_PUBLIC_BASE_URL: z.string().optional(),
   GOOGLE_GEMINI_API_KEY: z.string().optional(),
+  LIVEKIT_URL: z.string().optional(),
+  LIVEKIT_API_KEY: z.string().optional(),
+  LIVEKIT_API_SECRET: z.string().optional(),
   APP_BASE_URL: z.string().optional(),
   VERCEL_URL: z.string().optional(),
   USE_LEGACY_INTERVIEW_QUESTIONS: z.string().optional(),
@@ -54,4 +57,23 @@ function validate(): z.infer<typeof schema> {
 
 export function getEnv(): z.infer<typeof schema> {
   return validate();
+}
+
+export function getLiveKitConfig(): {
+  enabled: boolean;
+  url: string;
+  apiKey: string;
+  apiSecret: string;
+} | null {
+  const env = getEnv();
+  const url = env.LIVEKIT_URL?.trim();
+  const apiKey = env.LIVEKIT_API_KEY?.trim();
+  const apiSecret = env.LIVEKIT_API_SECRET?.trim();
+  if (!url || !apiKey || !apiSecret) return null;
+  return {
+    enabled: true,
+    url,
+    apiKey,
+    apiSecret,
+  };
 }

@@ -6,12 +6,25 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { ScreenShareGate } from "@/components/interview/ScreenShareGate";
 import { useRecording } from "@/context/RecordingContext";
-import { MicIcon, ArrowRightIcon, CircleIcon, AlertTriangleIcon } from "lucide-react";
+import {
+  MicIcon,
+  ArrowRightIcon,
+  CircleIcon,
+  AlertTriangleIcon,
+  MicOffIcon,
+  RotateCcwIcon,
+  CheckIcon,
+} from "lucide-react";
+import { createLiveKitVoiceSession } from "@/lib/livekit-voice.service";
 
 const UPLOAD_TIMEOUT_MS = 120_000;
 const UPLOAD_RETRIES = 2;
+const MAX_RESPONSE_DURATION_MS = 120_000; // 2 min per question
+const TIMER_WARNING_THRESHOLD_MS = 30_000; // 30s left
+const ANSWER_SAVED_DISPLAY_MS = 1_500;
 
 export function InterviewSessionClient({ token, interview, questions }) {
   const router = useRouter();
@@ -33,6 +46,17 @@ export function InterviewSessionClient({ token, interview, questions }) {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const failSentRef = useRef(false);
+
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceLoading, setVoiceLoading] = useState(true);
+  const [liveState, setLiveState] = useState("idle");
+  const [liveError, setLiveError] = useState("");
+  const [voicePaused, setVoicePaused] = useState(false);
+  const [answerSaved, setAnswerSaved] = useState(false);
+  const [timeRemainingMs, setTimeRemainingMs] = useState(null);
+  const liveSessionRef = useRef(null);
+  const durationTimerRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
 
   const questionList = Array.isArray(questions)
     ? questions.map((q) => ({
@@ -58,6 +82,14 @@ export function InterviewSessionClient({ token, interview, questions }) {
     },
     [token]
   );
+
+  useEffect(() => {
+    fetch(`/api/interview/${token}/live/config`)
+      .then((r) => r.json())
+      .then((d) => setVoiceEnabled(d?.enabled === true))
+      .catch(() => setVoiceEnabled(true))
+      .finally(() => setVoiceLoading(false));
+  }, [token]);
 
   useEffect(() => {
     if (gatePassed && !sessionStarted && questionList.length > 0) {
@@ -105,10 +137,104 @@ export function InterviewSessionClient({ token, interview, questions }) {
     };
   }, [token]);
 
+  const clearCountdown = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setTimeRemainingMs(null);
+  }, []);
+
+  const cleanupLiveSession = useCallback(() => {
+    if (durationTimerRef.current) {
+      clearTimeout(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
+    clearCountdown();
+    const session = liveSessionRef.current;
+    liveSessionRef.current = null;
+    if (session) {
+      session.disconnect();
+    }
+    setLiveState("idle");
+    setVoicePaused(false);
+  }, [clearCountdown]);
+
+  const stopVoiceCapture = useCallback(() => {
+    if (durationTimerRef.current) {
+      clearTimeout(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
+    clearCountdown();
+    if (liveSessionRef.current) {
+      liveSessionRef.current.endAudioStream();
+    }
+    setVoicePaused(true);
+  }, [clearCountdown]);
+
+  const startVoiceSession = useCallback(async () => {
+    if (!currentQuestion || !voiceEnabled || liveState === "connecting") return;
+    setLiveError("");
+    setVoicePaused(false);
+    cleanupLiveSession();
+
+    try {
+      const session = await createLiveKitVoiceSession(token, {
+        onStateChange: (s) => setLiveState(s),
+        onTranscriptChunk: (text) => {
+          if (!text?.trim()) return;
+          setAnswerText((prev) => (prev ? `${prev} ${text}`.trim() : text.trim()));
+        },
+        onError: (err) => setLiveError(err?.message ?? String(err)),
+      });
+      liveSessionRef.current = session;
+
+      session.speakQuestion(currentQuestion.text);
+
+      setTimeRemainingMs(MAX_RESPONSE_DURATION_MS);
+      countdownIntervalRef.current = setInterval(() => {
+        setTimeRemainingMs((prev) => {
+          if (prev == null || prev <= 0) return null;
+          const next = prev - 1000;
+          if (next <= 0 && countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          return next <= 0 ? null : next;
+        });
+      }, 1000);
+
+      durationTimerRef.current = setTimeout(() => {
+        stopVoiceCapture();
+      }, MAX_RESPONSE_DURATION_MS);
+    } catch (err) {
+      setLiveError(err?.message ?? String(err));
+      setLiveState("error");
+      cleanupLiveSession();
+    }
+  }, [token, currentQuestion, voiceEnabled, liveState, cleanupLiveSession, stopVoiceCapture]);
+
+  const handleStopVoice = useCallback(() => {
+    stopVoiceCapture();
+  }, [stopVoiceCapture]);
+
+  const handleRetryVoice = useCallback(() => {
+    cleanupLiveSession();
+    setAnswerText("");
+    setLiveError("");
+    startVoiceSession();
+  }, [cleanupLiveSession, startVoiceSession]);
+
+  useEffect(() => {
+    return () => cleanupLiveSession();
+  }, [cleanupLiveSession]);
+
   const recordTurnAndAdvance = useCallback(
     async (isLast) => {
       if (!currentQuestion || isAdvancing) return;
       setIsAdvancing(true);
+      setAnswerSaved(false);
+      const finalAnswer = answerText.trim() || null;
       try {
         await fetch(`/api/interview/${token}/session/next`, {
           method: "POST",
@@ -116,27 +242,47 @@ export function InterviewSessionClient({ token, interview, questions }) {
           body: JSON.stringify({
             questionId: currentQuestion.id,
             questionText: currentQuestion.text,
-            answer: answerText.trim() || null,
-            unanswered: !answerText.trim(),
+            answer: finalAnswer,
+            unanswered: !finalAnswer,
             totalQuestions: questionList.length,
           }),
         });
+        setAnswerSaved(true);
+        cleanupLiveSession();
         setAnswerText("");
-        if (!isLast) setCurrentIndex((i) => i + 1);
+        if (!isLast) {
+          await new Promise((r) => setTimeout(r, ANSWER_SAVED_DISPLAY_MS));
+          setAnswerSaved(false);
+          setCurrentIndex((i) => i + 1);
+        }
       } finally {
         setIsAdvancing(false);
       }
     },
-    [token, currentQuestion, answerText, questionList.length, isAdvancing]
+    [
+      token,
+      currentQuestion,
+      answerText,
+      questionList.length,
+      isAdvancing,
+      cleanupLiveSession,
+    ]
   );
 
   const handleNext = async () => {
+    if (voiceEnabled && (liveState === "listening" || liveState === "speaking")) {
+      handleStopVoice();
+    }
     const isLast = currentIndex >= questionList.length - 1;
     await recordTurnAndAdvance(isLast);
   };
 
   const handleComplete = async () => {
     if (violated || isUploading) return;
+
+    if (voiceEnabled && (liveState === "listening" || liveState === "speaking")) {
+      handleStopVoice();
+    }
 
     const isLast = currentIndex >= questionList.length - 1;
     if (isLast && currentQuestion) {
@@ -145,6 +291,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
 
     setIsUploading(true);
     setUploadError("");
+    cleanupLiveSession();
 
     const blob = await stopRecording();
     if (!blob) {
@@ -225,10 +372,32 @@ export function InterviewSessionClient({ token, interview, questions }) {
     );
   }
 
+  const showVoiceUI = voiceEnabled && !voiceLoading;
+  const totalQuestions = questionList.length || 1;
+  const currentQuestionNum = Math.min(currentIndex + 1, totalQuestions);
+  const progressPercent = totalQuestions > 0 ? (currentQuestionNum / totalQuestions) * 100 : 0;
+
+  const turnStatus =
+    answerSaved
+      ? "Saved"
+      : liveState === "connecting"
+        ? "Connecting…"
+        : liveState === "speaking"
+          ? "Agent speaking"
+          : voicePaused || liveState === "ended"
+            ? "Recording paused"
+            : liveState === "listening"
+              ? "Your turn"
+              : liveState === "error"
+                ? "Error"
+                : "Ready";
+
+  const isBusy = isUploading || isAdvancing;
+
   return (
     <div className="flex min-h-screen flex-col px-4 py-6 sm:py-8">
       {tabWarning && (
-        <div className="fixed left-0 right-0 top-0 z-40 flex items-center justify-center gap-2 bg-amber-500/90 px-4 py-2 text-sm font-medium text-amber-950">
+        <div className="fixed left-0 right-0 z-40 flex items-center justify-center gap-2 bg-amber-500/90 px-4 py-2 text-sm font-medium text-amber-950">
           <AlertTriangleIcon className="size-4" />
           Please return to this tab. Switching away may affect your recording.
         </div>
@@ -243,11 +412,27 @@ export function InterviewSessionClient({ token, interview, questions }) {
         </div>
         <h1 className="mt-2 text-xl font-bold sm:text-2xl">{interview.jobTitle}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Question {Math.min(currentIndex + 1, questionList.length)} of {questionList.length || 1}
+          Question {currentQuestionNum} of {totalQuestions}
         </p>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
+        <div className="space-y-2">
+          <div
+            className="h-2 w-full overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-valuenow={currentQuestionNum}
+            aria-valuemin={1}
+            aria-valuemax={totalQuestions}
+            aria-label={`Question ${currentQuestionNum} of ${totalQuestions}`}
+          >
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
         <Card size="sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -260,34 +445,153 @@ export function InterviewSessionClient({ token, interview, questions }) {
               <p className="text-sm font-medium text-muted-foreground">Question</p>
               <p className="mt-2 text-lg">{currentQuestion?.text ?? "No questions available."}</p>
             </div>
+
+            {showVoiceUI && (
+              <div className="flex items-center gap-2 rounded-lg border border-input bg-muted/20 px-3 py-2">
+                <span
+                  className={`text-sm font-medium ${
+                    turnStatus === "Your turn"
+                      ? "text-primary"
+                      : turnStatus === "Agent speaking"
+                        ? "text-muted-foreground"
+                        : turnStatus === "Saved"
+                          ? "text-green-600 dark:text-green-400"
+                          : turnStatus === "Recording paused"
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-muted-foreground"
+                  }`}
+                >
+                  {turnStatus === "Saved" && <CheckIcon className="mr-1.5 inline size-4" />}
+                  {turnStatus}
+                </span>
+                {timeRemainingMs != null && (
+                  <span
+                    className={`ml-auto text-sm tabular-nums ${
+                      timeRemainingMs <= TIMER_WARNING_THRESHOLD_MS
+                        ? "font-medium text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {Math.floor(timeRemainingMs / 60_000)}:
+                    {String(Math.floor((timeRemainingMs % 60_000) / 1000)).padStart(2, "0")} left
+                  </span>
+                )}
+              </div>
+            )}
+
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">
-                Your answer (optional – voice recording in a later phase)
+              <p className="mb-2 text-sm font-medium text-muted-foreground">
+                {showVoiceUI
+                  ? "Your answer (speak after the agent reads; you can edit below)"
+                  : "Your answer (optional)"}
               </p>
-              <textarea
-                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Type your answer here..."
-                value={answerText}
-                onChange={(e) => setAnswerText(e.target.value)}
-                disabled={isUploading || isAdvancing}
-              />
+              {showVoiceUI ? (
+                <Textarea
+                  className="min-h-[120px]"
+                  placeholder={
+                    liveState === "connecting"
+                      ? "Connecting…"
+                      : liveState === "speaking"
+                        ? "Agent is reading the question…"
+                        : liveState === "listening" && !voicePaused
+                          ? "Speak now. Your words will appear here."
+                          : liveState === "error"
+                            ? "Something went wrong. Click Retry."
+                            : "Click Start Question, then speak after the agent reads."
+                  }
+                  value={answerText}
+                  onChange={(e) => setAnswerText(e.target.value)}
+                  disabled={isBusy}
+                />
+              ) : (
+                <Textarea
+                  className="min-h-[120px]"
+                  placeholder="Type your answer here..."
+                  value={answerText}
+                  onChange={(e) => setAnswerText(e.target.value)}
+                  disabled={isBusy}
+                />
+              )}
             </div>
+
+            {showVoiceUI && (
+              <div className="flex flex-wrap gap-2">
+                {(liveState === "idle" || liveState === "ended") && (
+                  <Button
+                    onClick={startVoiceSession}
+                    disabled={isBusy}
+                    variant="default"
+                    size="sm"
+                    data-icon="inline-start"
+                  >
+                    <MicIcon className="size-4" />
+                    Start Question
+                  </Button>
+                )}
+                {(liveState === "connecting" || liveState === "listening" || liveState === "speaking") &&
+                  !voicePaused && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={handleStopVoice}
+                        disabled={isBusy}
+                        size="sm"
+                        data-icon="inline-start"
+                      >
+                        <MicOffIcon className="size-4" />
+                        Stop Recording
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleRetryVoice}
+                        disabled={isBusy}
+                        size="sm"
+                        data-icon="inline-start"
+                      >
+                        <RotateCcwIcon className="size-4" />
+                        Retry
+                      </Button>
+                    </>
+                  )}
+                {(voicePaused || liveState === "ended") && liveState !== "idle" && (
+                  <Button
+                    onClick={handleRetryVoice}
+                    disabled={isBusy}
+                    variant="outline"
+                    size="sm"
+                    data-icon="inline-start"
+                  >
+                    <RotateCcwIcon className="size-4" />
+                    Start Again
+                  </Button>
+                )}
+                {liveState === "error" && (
+                  <Button
+                    onClick={handleRetryVoice}
+                    disabled={isBusy}
+                    variant="default"
+                    size="sm"
+                    data-icon="inline-start"
+                  >
+                    <RotateCcwIcon className="size-4" />
+                    Retry
+                  </Button>
+                )}
+              </div>
+            )}
+            {liveError && <p className="text-sm text-destructive">{liveError}</p>}
+
             <Separator />
             <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Voice recording will be integrated in a later phase.
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
                 Your screen is being recorded for proctoring purposes.
               </p>
             </div>
-            {uploadError && (
-              <p className="text-sm text-destructive">{uploadError}</p>
-            )}
+            {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
               <Button
                 variant="outline"
-                disabled={isUploading || isAdvancing}
+                disabled={isBusy}
                 onClick={() => {
                   terminateRecording();
                   sendFail("user_navigated_back");
@@ -299,7 +603,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
               {questionList.length > 0 && currentIndex < questionList.length - 1 ? (
                 <Button
                   onClick={handleNext}
-                  disabled={isUploading || isAdvancing}
+                  disabled={isBusy}
                   data-icon="inline-end"
                 >
                   {isAdvancing ? "Saving…" : "Next"}
@@ -308,7 +612,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
               ) : (
                 <Button
                   onClick={handleComplete}
-                  disabled={isUploading || isAdvancing}
+                  disabled={isBusy}
                   data-icon="inline-end"
                 >
                   {isUploading ? "Uploading…" : "Submit Interview"}

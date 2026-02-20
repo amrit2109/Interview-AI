@@ -6,6 +6,9 @@
 import { z } from "zod";
 import { aiMetadataSchema } from "./ai-metadata";
 
+export const transcriptQualitySchema = z.enum(["missing", "partial", "full"]);
+export type TranscriptQuality = z.infer<typeof transcriptQualitySchema>;
+
 export const perQuestionEvaluationSchema = z.object({
   questionId: z.string(),
   skill: z.string(),
@@ -14,6 +17,7 @@ export const perQuestionEvaluationSchema = z.object({
   communication: z.number().min(0).max(10),
   role_alignment: z.number().min(0).max(10),
   unanswered: z.boolean().default(false),
+  transcriptQuality: transcriptQualitySchema.optional(),
   evidenceSpans: z.array(z.string()).optional(),
   notes: z.string().optional(),
 });

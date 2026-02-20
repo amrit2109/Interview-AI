@@ -91,9 +91,25 @@ async function CandidateReportContent({ id }) {
                           key={pq.questionId}
                           className="rounded-lg border bg-muted/30 p-3 text-sm"
                         >
-                          <p className="font-medium text-foreground">
-                            {pq.skill} {pq.unanswered && "(unanswered)"}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-foreground">
+                              {pq.skill} {pq.unanswered && "(unanswered)"}
+                            </p>
+                            {pq.transcriptQuality && (
+                              <Badge
+                                variant={
+                                  pq.transcriptQuality === "missing"
+                                    ? "destructive"
+                                    : pq.transcriptQuality === "partial"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                                className="text-xs"
+                              >
+                                transcript: {pq.transcriptQuality}
+                              </Badge>
+                            )}
+                          </div>
                           <div className="mt-1 flex gap-4 text-muted-foreground">
                             <span>Depth: {pq.technical_depth}/10</span>
                             <span>Correct: {pq.correctness}/10</span>

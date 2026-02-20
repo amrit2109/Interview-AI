@@ -11,6 +11,7 @@ function parseBody(body: unknown): {
   questionId: string;
   questionText: string;
   answer: string | null;
+  transcriptChunks?: string[];
   unanswered: boolean;
   totalQuestions: number;
 } | null {
@@ -19,10 +20,16 @@ function parseBody(body: unknown): {
   const questionId = typeof o.questionId === "string" ? o.questionId : "";
   const questionText = typeof o.questionText === "string" ? o.questionText : "";
   if (!questionId || !questionText) return null;
-  const answer = typeof o.answer === "string" ? o.answer : null;
+  let answer: string | null = typeof o.answer === "string" ? o.answer : null;
+  const chunks = Array.isArray(o.transcriptChunks)
+    ? (o.transcriptChunks as unknown[]).filter((c): c is string => typeof c === "string")
+    : [];
+  if (!answer?.trim() && chunks.length > 0) {
+    answer = chunks.join(" ").trim() || null;
+  }
   const unanswered = o.unanswered === true || !(answer?.trim());
   const totalQuestions = typeof o.totalQuestions === "number" ? o.totalQuestions : 0;
-  return { questionId, questionText, answer, unanswered, totalQuestions };
+  return { questionId, questionText, answer, transcriptChunks: chunks, unanswered, totalQuestions };
 }
 
 export async function POST(

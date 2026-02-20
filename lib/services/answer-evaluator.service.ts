@@ -161,9 +161,19 @@ Score each answer. For UNANSWERED, set unanswered: true and scores to 0. Return 
       notes?: string;
     }> = [];
 
+    const PARTIAL_TRANSCRIPT_THRESHOLD = 30;
+
     for (const pq of perQuestionRaw) {
       const qa = qaPairs.find((q) => q.questionId === pq.questionId || q.skill === pq.skill);
       const unanswered = qa?.unanswered ?? false;
+      const answerText = qa?.answer?.trim() ?? "";
+      const transcriptQuality =
+        !answerText || answerText === "(no answer)"
+          ? ("missing" as const)
+          : answerText.length < PARTIAL_TRANSCRIPT_THRESHOLD
+            ? ("partial" as const)
+            : ("full" as const);
+
       const result = perQuestionEvaluationSchema.safeParse({
         questionId: pq.questionId ?? qa?.questionId ?? "",
         skill: pq.skill ?? qa?.skill ?? "",
@@ -172,6 +182,7 @@ Score each answer. For UNANSWERED, set unanswered: true and scores to 0. Return 
         communication: unanswered ? 0 : Math.min(10, Math.max(0, Number(pq.communication) ?? 5)),
         role_alignment: unanswered ? 0 : Math.min(10, Math.max(0, Number(pq.role_alignment) ?? 5)),
         unanswered,
+        transcriptQuality,
         evidenceSpans: Array.isArray(pq.evidenceSpans) ? pq.evidenceSpans : [],
         notes: pq.notes,
       });

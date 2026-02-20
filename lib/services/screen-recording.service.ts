@@ -86,7 +86,9 @@ export async function startRecording(): Promise<{ ok: boolean; error?: string }>
 
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
+      video: {
+        displaySurface: "monitor", // entire screen only (no tab/window)
+      },
       audio: true,
     });
     activeStream = stream;
