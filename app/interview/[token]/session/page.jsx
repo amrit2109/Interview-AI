@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { getInterviewDisplayByToken } from "@/lib/services/interview-token-guard";
-import { getInterviewQuestions, getPreScreen } from "@/lib/api";
+import { getQuestionsForSession } from "@/lib/services/interview-questions.service";
+import { getPreScreen } from "@/lib/api";
 import { InterviewSessionClient } from "@/components/interview/InterviewSessionClient";
 import { RecordingProvider } from "@/context/RecordingContext";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 async function InterviewSessionContent({ token }) {
   const [interviewRes, questionsRes, preScreenRes] = await Promise.all([
     getInterviewDisplayByToken(token),
-    getInterviewQuestions(),
+    getQuestionsForSession(token),
     getPreScreen(token),
   ]);
 

@@ -6,17 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getCandidateById, getCandidateReport } from "@/lib/api";
+import { getCandidateById, getCandidateReport, getEvaluationByCandidateId } from "@/lib/api";
 import { ArrowLeftIcon, ThumbsUpIcon, AlertTriangleIcon } from "lucide-react";
+import { EvaluationOverrideForm } from "@/components/admin/EvaluationOverrideForm";
 
 async function CandidateReportContent({ id }) {
-  const [candidateRes, reportRes] = await Promise.all([
+  const [candidateRes, reportRes, evaluationRes] = await Promise.all([
     getCandidateById(id),
     getCandidateReport(id),
+    getEvaluationByCandidateId(id),
   ]);
 
   const candidate = candidateRes.data;
   const report = reportRes.data;
+  const evaluation = evaluationRes.data;
 
   if (!candidate) {
     notFound();
@@ -69,13 +72,64 @@ async function CandidateReportContent({ id }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">ATS Score</p>
-                  <p className="mt-1 text-2xl font-bold">{report.atsScore}%</p>
+                  <p className="mt-1 text-2xl font-bold">{report.atsScore ?? "—"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Interview Score</p>
-                  <p className="mt-1 text-2xl font-bold">{report.interviewScore}%</p>
+                  <p className="mt-1 text-2xl font-bold">{report.interviewScore ?? "—"}/10</p>
                 </div>
               </div>
+
+              {evaluation && evaluation.perQuestion?.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="mb-2 font-medium">Per-Question Breakdown</h3>
+                    <div className="space-y-3">
+                      {evaluation.perQuestion.map((pq, i) => (
+                        <div
+                          key={pq.questionId}
+                          className="rounded-lg border bg-muted/30 p-3 text-sm"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-foreground">
+                              {pq.skill} {pq.unanswered && "(unanswered)"}
+                            </p>
+                            {pq.transcriptQuality && (
+                              <Badge
+                                variant={
+                                  pq.transcriptQuality === "missing"
+                                    ? "destructive"
+                                    : pq.transcriptQuality === "partial"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                                className="text-xs"
+                              >
+                                transcript: {pq.transcriptQuality}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="mt-1 flex gap-4 text-muted-foreground">
+                            <span>Depth: {pq.technical_depth}/10</span>
+                            <span>Correct: {pq.correctness}/10</span>
+                            <span>Comm: {pq.communication}/10</span>
+                            <span>Role: {pq.role_alignment}/10</span>
+                          </div>
+                          {pq.evidenceSpans?.length > 0 && (
+                            <p className="mt-2 text-xs italic">{pq.evidenceSpans[0]}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {evaluation.unansweredCount > 0 && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {evaluation.unansweredCount} question(s) unanswered (no penalty applied).
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
 
               <Separator />
 
@@ -130,6 +184,13 @@ async function CandidateReportContent({ id }) {
                   {report.recommendation}
                 </Badge>
               </div>
+
+              {evaluation && (
+                <EvaluationOverrideForm
+                  candidateId={id}
+                  currentScore={report.interviewScore ?? evaluation.overallScore}
+                />
+              )}
             </>
           )}
         </CardContent>

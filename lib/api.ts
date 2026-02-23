@@ -35,6 +35,8 @@ export { getInterviewQuestions } from "@/lib/services/questions.service";
 
 export { submitPreScreen, getPreScreen } from "@/lib/services/pre-screen.service";
 
+export { getEvaluationByCandidateId } from "@/lib/services/interview-evaluation.service";
+
 /** Normalized write result: { ok, error } instead of { ok, error_message } */
 function toWriteResult<T extends { ok: boolean; error_message?: string }>(
   result: T

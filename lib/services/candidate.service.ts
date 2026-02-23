@@ -369,3 +369,30 @@ export async function completeInterviewWithoutRecording(
     return { ok: false, error: "Failed to complete interview." };
   }
 }
+
+/**
+ * Link interview pack to candidate. Used after pack generation.
+ */
+export async function updateCandidateInterviewPackId(
+  candidateId: string,
+  packId: string
+): Promise<RecordingUpdateResult> {
+  const sql = getSql();
+  if (!sql) return { ok: false, error: "Database not configured." };
+  if (!candidateId?.trim() || !packId?.trim()) {
+    return { ok: false, error: "Candidate ID and pack ID are required." };
+  }
+  try {
+    const result = await sql`
+      UPDATE candidates SET interview_pack_id = ${packId} WHERE id = ${candidateId} RETURNING id
+    `;
+    if (!result?.length) return { ok: false, error: "Candidate not found." };
+    return { ok: true };
+  } catch (err) {
+    console.error("updateCandidateInterviewPackId:", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to link interview pack.",
+    };
+  }
+}
