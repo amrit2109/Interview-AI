@@ -53,10 +53,12 @@ export function InterviewSessionClient({ token, interview, questions }) {
   const [liveError, setLiveError] = useState("");
   const [voicePaused, setVoicePaused] = useState(false);
   const [answerSaved, setAnswerSaved] = useState(false);
+  const [shouldAutoStartVoice, setShouldAutoStartVoice] = useState(false);
   const [timeRemainingMs, setTimeRemainingMs] = useState(null);
   const liveSessionRef = useRef(null);
   const durationTimerRef = useRef(null);
   const countdownIntervalRef = useRef(null);
+  const transcriptConfirmedRef = useRef("");
 
   const questionList = Array.isArray(questions)
     ? questions.map((q) => ({
@@ -179,11 +181,18 @@ export function InterviewSessionClient({ token, interview, questions }) {
     cleanupLiveSession();
 
     try {
+      transcriptConfirmedRef.current = "";
       const session = await createLiveKitVoiceSession(token, {
         onStateChange: (s) => setLiveState(s),
-        onTranscriptChunk: (text) => {
+        onTranscriptChunk: (text, isFinal) => {
           if (!text?.trim()) return;
-          setAnswerText((prev) => (prev ? `${prev} ${text}`.trim() : text.trim()));
+          const confirmed = transcriptConfirmedRef.current;
+          if (isFinal) {
+            transcriptConfirmedRef.current = (confirmed ? `${confirmed} ` : "") + text.trim();
+            setAnswerText(transcriptConfirmedRef.current);
+          } else {
+            setAnswerText((confirmed ? `${confirmed} ` : "") + text.trim());
+          }
         },
         onError: (err) => setLiveError(err?.message ?? String(err)),
       });
@@ -229,6 +238,31 @@ export function InterviewSessionClient({ token, interview, questions }) {
     return () => cleanupLiveSession();
   }, [cleanupLiveSession]);
 
+  useEffect(() => {
+    if (!shouldAutoStartVoice || !voiceEnabled || !currentQuestion) return;
+    setShouldAutoStartVoice(false);
+    const session = liveSessionRef.current;
+    if (session) {
+      session.speakQuestion(currentQuestion.text);
+      setTimeRemainingMs(MAX_RESPONSE_DURATION_MS);
+      setVoicePaused(false);
+      countdownIntervalRef.current = setInterval(() => {
+        setTimeRemainingMs((prev) => {
+          if (prev == null || prev <= 0) return null;
+          const next = prev - 1000;
+          if (next <= 0 && countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          return next <= 0 ? null : next;
+        });
+      }, 1000);
+      durationTimerRef.current = setTimeout(stopVoiceCapture, MAX_RESPONSE_DURATION_MS);
+    } else {
+      startVoiceSession();
+    }
+  }, [shouldAutoStartVoice, voiceEnabled, currentQuestion, startVoiceSession, stopVoiceCapture]);
+
   const recordTurnAndAdvance = useCallback(
     async (isLast) => {
       if (!currentQuestion || isAdvancing) return;
@@ -248,12 +282,24 @@ export function InterviewSessionClient({ token, interview, questions }) {
           }),
         });
         setAnswerSaved(true);
-        cleanupLiveSession();
         setAnswerText("");
+        transcriptConfirmedRef.current = "";
         if (!isLast) {
+          if (voiceEnabled && liveSessionRef.current) {
+            clearCountdown();
+            if (durationTimerRef.current) {
+              clearTimeout(durationTimerRef.current);
+              durationTimerRef.current = null;
+            }
+          } else {
+            cleanupLiveSession();
+          }
           await new Promise((r) => setTimeout(r, ANSWER_SAVED_DISPLAY_MS));
           setAnswerSaved(false);
           setCurrentIndex((i) => i + 1);
+          setShouldAutoStartVoice(true);
+        } else {
+          cleanupLiveSession();
         }
       } finally {
         setIsAdvancing(false);
@@ -266,14 +312,24 @@ export function InterviewSessionClient({ token, interview, questions }) {
       questionList.length,
       isAdvancing,
       cleanupLiveSession,
+      voiceEnabled,
+      clearCountdown,
     ]
   );
 
   const handleNext = async () => {
-    if (voiceEnabled && (liveState === "listening" || liveState === "speaking")) {
-      handleStopVoice();
-    }
     const isLast = currentIndex >= questionList.length - 1;
+    if (voiceEnabled && (liveState === "listening" || liveState === "speaking")) {
+      if (!isLast && liveSessionRef.current) {
+        clearCountdown();
+        if (durationTimerRef.current) {
+          clearTimeout(durationTimerRef.current);
+          durationTimerRef.current = null;
+        }
+      } else {
+        handleStopVoice();
+      }
+    }
     await recordTurnAndAdvance(isLast);
   };
 

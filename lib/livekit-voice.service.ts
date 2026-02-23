@@ -1,9 +1,11 @@
 /**
  * LiveKit voice session for interview.
  * Connects to room, sends questions via lk.chat, collects transcript from lk.transcription.
+ * Uses READ_QUESTION_PREFIX for client–agent contract (must match livekit-agent/main.ts).
  */
 
 import { Room, RoomEvent, createLocalAudioTrack } from "livekit-client";
+import { READ_QUESTION_PREFIX } from "./interview-constants";
 
 export type LiveSessionState =
   | "idle"
@@ -72,15 +74,45 @@ export async function createLiveKitVoiceSession(
 
   let localIdentity: string | null = null;
   const audioElements: HTMLAudioElement[] = [];
+  let pendingQuestion: string | null = null;
+  let agentReadySent = false;
+
+  const doSendQuestion = (questionText: string) => {
+    if (disconnected || room.state !== "connected") return;
+    safeStateChange("speaking");
+    const fullMsg = `${READ_QUESTION_PREFIX}${questionText}`;
+    room.localParticipant
+      .sendText(fullMsg, { topic: "lk.chat" })
+      .then(() => {
+        if (!disconnected) safeStateChange("listening");
+      })
+      .catch((err) => safeError(err));
+  };
+
+  const trySendPending = () => {
+    if (agentReadySent && pendingQuestion && !disconnected && room.state === "connected") {
+      const q = pendingQuestion;
+      pendingQuestion = null;
+      doSendQuestion(q);
+    }
+  };
 
   room.on(RoomEvent.Connected, () => {
     if (disconnected) return;
     localIdentity = room.localParticipant.identity;
+    if (room.remoteParticipants.size > 0) agentReadySent = true;
+    trySendPending();
     safeStateChange("listening");
   });
 
   room.on(RoomEvent.Disconnected, () => {
     safeStateChange("ended");
+  });
+
+  room.on(RoomEvent.ParticipantConnected, () => {
+    if (disconnected) return;
+    agentReadySent = true;
+    trySendPending();
   });
 
   room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
@@ -95,13 +127,21 @@ export async function createLiveKitVoiceSession(
   });
 
   room.registerTextStreamHandler("lk.transcription", async (reader, participantInfo) => {
-    if (disconnected || participantInfo.identity !== localIdentity) return;
+    if (disconnected) return;
     try {
       const message = await reader.readAll();
       if (!message?.trim()) return;
       const isFinal =
         reader.info?.attributes?.["lk.transcription_final"] === "true";
-      if (!disconnected) callbacks.onTranscriptChunk?.(message, isFinal);
+
+      if (participantInfo.identity === localIdentity) {
+        if (!disconnected) callbacks.onTranscriptChunk?.(message, isFinal);
+      } else {
+        if (!agentReadySent) {
+          agentReadySent = true;
+          trySendPending();
+        }
+      }
     } catch {
       /* ignore */
     }
@@ -123,18 +163,11 @@ export async function createLiveKitVoiceSession(
   return {
     speakQuestion(questionText: string) {
       if (disconnected || room.state !== "connected") return;
-      safeStateChange("speaking");
-      room.localParticipant
-        .sendText(
-          `Please read this interview question aloud exactly as written: ${questionText}`,
-          { topic: "lk.chat" }
-        )
-        .then(() => {
-          if (!disconnected) safeStateChange("listening");
-        })
-        .catch((err) => {
-          safeError(err);
-        });
+      pendingQuestion = questionText;
+      if (agentReadySent) {
+        doSendQuestion(questionText);
+        pendingQuestion = null;
+      }
     },
 
     endAudioStream() {
