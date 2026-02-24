@@ -41,7 +41,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const raw = await file.arrayBuffer();
+    const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+      return NextResponse.json({ error: "Invalid or empty file." }, { status: 400 });
+    }
     const { text, error: extractError } = await extractTextFromResume(
       buffer,
       file.type,
@@ -103,10 +107,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Analysis failed.";
     console.error("analyze-resume:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Analysis failed." },
-      { status: 500 }
-    );
+    const safeMessage =
+      typeof message === "string" && message.length <= 300 && !message.includes('"code":')
+        ? message
+        : "Resume analysis failed. Please try again later.";
+    return NextResponse.json({ error: safeMessage }, { status: 500 });
   }
 }
