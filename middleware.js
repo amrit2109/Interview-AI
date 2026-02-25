@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, verifyToken } from "./lib/auth";
 
 const ADMIN_API_PATHS = [
+  "/api/admin",
   "/api/candidates/send-interview",
   "/api/candidates/analyze-resume",
+  "/api/candidates/upload-resume",
 ];
 
 function isAdminApiPath(pathname) {
@@ -44,5 +46,11 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/candidates/send-interview", "/api/candidates/analyze-resume"],
+  matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/api/candidates/send-interview",
+    "/api/candidates/analyze-resume",
+    "/api/candidates/upload-resume",
+  ],
 };

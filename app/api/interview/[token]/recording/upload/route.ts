@@ -100,7 +100,7 @@ export async function POST(
     const errMsg = result.error ?? "Failed to save recording.";
     if (errMsg.includes("does not exist") || errMsg.includes("column")) {
       return NextResponse.json(
-        { error: "Database schema is missing recording columns. Run the migration: db/migrations/002_add_interview_recording_columns.sql" },
+        { error: "Database schema is missing recording columns. Run the migration: db/migrations/003_add_interview_recording_columns.sql" },
         { status: 500 }
       );
     }

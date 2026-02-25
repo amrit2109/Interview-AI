@@ -7,11 +7,16 @@ import {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
+function getExtension(filename: string): string {
+  const match = filename.toLowerCase().match(/\.(pdf|txt|docx?)$/);
+  return match ? `.${match[1]}` : "";
+}
+
 function isAllowedFile(file: File): boolean {
-  const ext = file.name.toLowerCase().slice(-5);
-  const hasExt = RESUME_ALLOWED_EXTENSIONS.some((e) => ext.endsWith(e));
+  const ext = getExtension(file.name);
+  const hasExt = ext && (RESUME_ALLOWED_EXTENSIONS as readonly string[]).includes(ext);
   const hasType = (RESUME_ALLOWED_TYPES as readonly string[]).includes(file.type);
-  return hasExt || hasType;
+  return Boolean(hasExt && hasType);
 }
 
 export async function POST(request: NextRequest) {
@@ -54,9 +59,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ resumeLink: data.finalUrl });
   } catch (err) {
     console.error("upload-resume:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Upload failed." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
 }

@@ -8,7 +8,7 @@ import { z } from "zod";
 const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   DATABASE_URL: z.string().min(1).optional(),
-  SESSION_SECRET: z.string().min(1).optional(),
+  SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters").optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),
@@ -44,8 +44,10 @@ function validate(): z.infer<typeof schema> {
       if (!parsed.data.DATABASE_URL) {
         throw new Error("DATABASE_URL must be set. Database operations will fail.");
       }
-      if (process.env.NODE_ENV === "production" && !parsed.data.SESSION_SECRET) {
-        throw new Error("SESSION_SECRET must be set in production.");
+      if (process.env.NODE_ENV === "production") {
+        if (!parsed.data.SESSION_SECRET || parsed.data.SESSION_SECRET.length < 32) {
+          throw new Error("SESSION_SECRET must be set and at least 32 characters in production.");
+        }
       }
     }
     return cached;

@@ -14,11 +14,16 @@ const ALLOWED_TYPES = [
 ];
 const ALLOWED_EXT = [".pdf", ".txt", ".doc", ".docx"];
 
+function getExtension(filename: string): string {
+  const match = filename.toLowerCase().match(/\.(pdf|txt|docx?)$/);
+  return match ? `.${match[1]}` : "";
+}
+
 function isAllowedFile(file: File): boolean {
-  const ext = file.name.toLowerCase().slice(-5);
-  const hasExt = ALLOWED_EXT.some((e) => ext.endsWith(e));
+  const ext = getExtension(file.name);
+  const hasExt = ext && ALLOWED_EXT.includes(ext);
   const hasType = ALLOWED_TYPES.includes(file.type);
-  return hasExt || hasType;
+  return Boolean(hasExt && hasType);
 }
 
 export async function POST(request: NextRequest) {

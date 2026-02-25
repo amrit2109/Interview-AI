@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { ADMIN_SESSION_COOKIE } from "@/lib/auth";
+import { ADMIN_SESSION_COOKIE, requireAdminSession } from "@/lib/auth";
 import {
   getJobDescriptions,
   analyzeCandidateResumeMock,
@@ -28,6 +28,11 @@ export async function handleLogout() {
  * @returns {Promise<{ data: object[]; error: string | null }>}
  */
 export async function getJobDescriptionsAction() {
+  try {
+    await requireAdminSession();
+  } catch {
+    return { data: [], error: "Unauthorized" };
+  }
   return getJobDescriptions();
 }
 
@@ -37,6 +42,11 @@ export async function getJobDescriptionsAction() {
  * @returns {Promise<{ data: object | null; error: string | null }>}
  */
 export async function analyzeCandidateResumeMockAction(formData) {
+  try {
+    await requireAdminSession();
+  } catch {
+    return { data: null, error: "Unauthorized" };
+  }
   const file = formData?.get("file");
   if (!(file instanceof File)) {
     return { data: null, error: "No file selected." };
@@ -50,6 +60,11 @@ export async function analyzeCandidateResumeMockAction(formData) {
  * @returns {Promise<{ data: object | null; error: string | null }>}
  */
 export async function createCandidateMockAction(payload) {
+  try {
+    await requireAdminSession();
+  } catch {
+    return { data: null, error: "Unauthorized" };
+  }
   return createCandidateMock(payload);
 }
 
@@ -59,6 +74,11 @@ export async function createCandidateMockAction(payload) {
  * @returns {Promise<{ data: object | null; error: string | null }>}
  */
 export async function createJobDescriptionAction(payload) {
+  try {
+    await requireAdminSession();
+  } catch {
+    return { data: null, error: "Unauthorized" };
+  }
   const result = await createJobDescription(payload);
   if (result.data) {
     revalidatePath("/admin/job-descriptions");
@@ -73,6 +93,11 @@ export async function createJobDescriptionAction(payload) {
  * @returns {Promise<{ ok: boolean; data?: object; error?: string }>}
  */
 export async function updateJobDescriptionOpeningsAction({ job_description_id, openings }) {
+  try {
+    await requireAdminSession();
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
   const result = await updateJobDescriptionOpeningsById({ job_description_id, openings });
   if (result.ok) {
     revalidatePath("/admin/job-descriptions");
@@ -87,6 +112,11 @@ export async function updateJobDescriptionOpeningsAction({ job_description_id, o
  * @returns {Promise<{ ok: boolean; deleted_id?: string; error?: string }>}
  */
 export async function deleteJobDescriptionAction({ job_description_id }) {
+  try {
+    await requireAdminSession();
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
   const result = await deleteJobDescriptionById({ job_description_id });
   if (result.ok) {
     revalidatePath("/admin/job-descriptions");
@@ -101,6 +131,11 @@ export async function deleteJobDescriptionAction({ job_description_id }) {
  * @returns {Promise<{ ok: boolean; deleted_id?: string; error?: string }>}
  */
 export async function deleteCandidateAction({ candidate_id }) {
+  try {
+    await requireAdminSession();
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
   const result = await deleteCandidateById({ candidate_id });
   if (result.ok) {
     revalidatePath("/admin/candidates");
