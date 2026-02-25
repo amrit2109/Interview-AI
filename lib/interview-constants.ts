@@ -5,3 +5,6 @@
  */
 export const READ_QUESTION_PREFIX =
   "Please read this interview question aloud exactly as written: ";
+
+/** Client -> Agent: submit answer before advancing (via lk.chat). Must match livekit-agent. */
+export const SUBMIT_ANSWER_PREFIX = "SUBMIT_ANSWER:";

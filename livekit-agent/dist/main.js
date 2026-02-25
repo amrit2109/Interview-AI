@@ -1,15 +1,13 @@
 /**
  * LiveKit interview agent using Gemini Live API.
- * Dispatched to rooms when candidate joins (RoomAgentDispatch in token).
- * Reads questions verbatim when client sends text via lk.chat (bypasses LLM for TTS).
+ * Strict turn-taking: mic disabled during question speech, enabled only after playout.
  */
 import { WorkerOptions, cli, defineAgent, voice, } from "@livekit/agents";
 import * as google from "@livekit/agents-plugin-google";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { READ_QUESTION_PREFIX, SUBMIT_ANSWER_PREFIX, INTERVIEW_CONTROL_TOPIC, } from "./interview-constants.js";
 dotenv.config({ path: ".env.local" });
-/** Must match lib/interview-constants.ts READ_QUESTION_PREFIX (client–agent contract). */
-const READ_QUESTION_PREFIX = "Please read this interview question aloud exactly as written: ";
 const INTERVIEW_INSTRUCTIONS = `You are an interview assistant for candidates in India.
 When the user sends you text that starts with "Please read this interview question aloud" or similar, speak the question exactly as written.
 Use a slow, clear, and measured pace—easy to follow and understand.
@@ -17,12 +15,43 @@ Use natural Indian English accent and pronunciation.
 Do not add commentary, rephrasing, or extra words. Read the question verbatim.
 Pause briefly between sentences. Sound natural and human, not robotic.
 When the user speaks (their answer), only listen. Do not speak, evaluate, or comment until the next question is sent.`;
-function createTextInputCallback(_session) {
-    return (sess, ev) => {
+function emitControl(ctx, ev) {
+    try {
+        const data = new TextEncoder().encode(JSON.stringify(ev));
+        ctx.room.localParticipant?.publishData(data, {
+            reliable: true,
+            topic: INTERVIEW_CONTROL_TOPIC,
+        });
+        console.info("[interview-agent] emitControl", ev.type);
+    }
+    catch (err) {
+        console.error("[interview-agent] emitControl failed:", err);
+    }
+}
+function createTextInputCallback(session, ctx) {
+    return async (sess, ev) => {
         if (ev.text.startsWith(READ_QUESTION_PREFIX)) {
             const questionText = ev.text.slice(READ_QUESTION_PREFIX.length).trim();
             sess.interrupt();
-            sess.say(questionText);
+            sess.input.setAudioEnabled(false);
+            emitControl(ctx, { type: "agent_speaking_started" });
+            try {
+                const handle = sess.say(questionText, {
+                    allowInterruptions: false,
+                    addToChatCtx: false,
+                });
+                await handle.waitForPlayout();
+            }
+            finally {
+                emitControl(ctx, { type: "agent_speaking_finished" });
+                emitControl(ctx, { type: "user_turn_open" });
+                sess.input.setAudioEnabled(true);
+            }
+            return;
+        }
+        if (ev.text.startsWith(SUBMIT_ANSWER_PREFIX)) {
+            sess.interrupt();
+            sess.input.setAudioEnabled(false);
             return;
         }
         sess.interrupt();
@@ -49,12 +78,14 @@ export default defineAgent({
             }),
             room: ctx.room,
             inputOptions: {
-                textInputCallback: createTextInputCallback(session),
+                textInputCallback: createTextInputCallback(session, ctx),
             },
         });
-        await session.generateReply({
+        const greetHandle = await session.generateReply({
             instructions: "Greet the candidate briefly. Say you are ready to begin the interview and will read each question when it appears.",
         });
+        await greetHandle.waitForPlayout();
+        emitControl(ctx, { type: "agent_ready" });
         await ctx.waitForParticipant();
     },
 });

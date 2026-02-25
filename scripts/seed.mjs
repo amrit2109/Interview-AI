@@ -1,7 +1,10 @@
 /**
  * Seed script: populates Neon PostgreSQL with initial data from mock files.
  * Run after schema: npm run db:seed
- * Requires: DATABASE_URL in .env.local (or export DATABASE_URL)
+ *
+ * Requires in .env or .env.local:
+ *   - DATABASE_URL
+ *   - SEED_ADMIN_PASSWORD (no default; must be set)
  */
 
 import dotenv from "dotenv";
@@ -16,7 +19,13 @@ dotenv.config(); // fallback to .env
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  console.error("DATABASE_URL is required. Add it to .env.local or export it.");
+  console.error("DATABASE_URL is required. Add it to .env or .env.local.");
+  process.exit(1);
+}
+
+const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+if (!adminPassword || adminPassword.trim() === "") {
+  console.error("SEED_ADMIN_PASSWORD is required. Add it to .env or .env.local.");
   process.exit(1);
 }
 
@@ -26,7 +35,7 @@ async function seed() {
   console.log("Seeding database...");
 
   // 1. Admins (hash password)
-  const passwordHash = bcrypt.hashSync("Admin@123", 10);
+  const passwordHash = bcrypt.hashSync(adminPassword, 10);
   await sql`
     INSERT INTO admins (id, email, password_hash, name, role)
     VALUES ('1', 'admin@orion.com', ${passwordHash}, 'Admin User', 'admin')

@@ -244,6 +244,41 @@ export interface RecordTurnInput {
   unanswered: boolean;
 }
 
+export async function getTurnBySessionAndQuestion(
+  sessionId: string,
+  questionId: string
+): Promise<{ data: InterviewTurnRow | null; error: string | null }> {
+  const sql = getSql();
+  if (!sql) return { data: null, error: "Database not configured." };
+
+  try {
+    const rows = await sql`
+      SELECT id, session_id, question_id, question_text, is_follow_up, candidate_answer, transcript_chunk, started_at, ended_at, unanswered
+      FROM interview_turns WHERE session_id = ${sessionId} AND question_id = ${questionId} LIMIT 1
+    `;
+    const r = rows[0] as Record<string, unknown> | undefined;
+    if (!r) return { data: null, error: null };
+    return {
+      data: {
+        id: String(r.id),
+        sessionId: String(r.session_id),
+        questionId: String(r.question_id),
+        questionText: String(r.question_text),
+        isFollowUp: Boolean(r.is_follow_up),
+        candidateAnswer: r.candidate_answer != null ? String(r.candidate_answer) : null,
+        transcriptChunk: r.transcript_chunk != null ? String(r.transcript_chunk) : null,
+        startedAt: r.started_at instanceof Date ? r.started_at.toISOString() : String(r.started_at),
+        endedAt: r.ended_at != null ? (r.ended_at instanceof Date ? r.ended_at.toISOString() : String(r.ended_at)) : null,
+        unanswered: Boolean(r.unanswered),
+      },
+      error: null,
+    };
+  } catch (err) {
+    console.error("getTurnBySessionAndQuestion:", err);
+    return { data: null, error: err instanceof Error ? err.message : "Failed to fetch turn." };
+  }
+}
+
 export async function recordTurn(
   input: RecordTurnInput
 ): Promise<{ ok: boolean; error: string | null }> {

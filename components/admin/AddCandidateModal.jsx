@@ -120,11 +120,18 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
         method: "POST",
         body: formData,
       });
-      const json = await res.json();
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        setError("Resume analysis failed. Invalid response from server.");
+        return;
+      }
       if (!res.ok) {
         let errMsg = json?.error ?? "Resume analysis failed.";
-        if (typeof errMsg === "object") errMsg = JSON.stringify(errMsg);
-        if (typeof errMsg === "string" && (errMsg.length > 300 || errMsg.includes('"code":'))) {
+        if (typeof errMsg === "object") errMsg = "Resume analysis failed. Please try again later.";
+        else if (typeof errMsg !== "string") errMsg = "Resume analysis failed.";
+        else if (errMsg.length > 300 || errMsg.includes('"code":')) {
           errMsg = "Resume analysis failed. Please try again later.";
         }
         setError(errMsg);
@@ -141,6 +148,8 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
       setSkills(Array.isArray(c.skills) ? c.skills.join(", ") : "");
       setEducation(Array.isArray(c.education) ? c.education.join(", ") : "");
       setPosition((json.match?.roleName ?? "").trim());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Resume analysis failed. Please try again later.");
     } finally {
       setIsAnalyzing(false);
     }

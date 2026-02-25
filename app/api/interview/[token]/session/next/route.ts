@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCandidateByInterviewToken } from "@/lib/services/candidate.service";
 import {
   getSessionByToken,
+  getTurnBySessionAndQuestion,
   recordTurn,
   advanceSession,
 } from "@/lib/services/interview-session.service";
 import { getInterviewPackById } from "@/lib/services/interview-pack.service";
+import { isEnglish } from "@/lib/language/english-only";
 
 function parseBody(body: unknown): {
   questionId: string;
@@ -62,6 +64,13 @@ export async function POST(
     );
   }
 
+  if (body.answer?.trim()) {
+    const { isEnglish: ok, reason } = isEnglish(body.answer);
+    if (!ok && reason) {
+      return NextResponse.json({ error: reason }, { status: 422 });
+    }
+  }
+
   const { data: session } = await getSessionByToken(token.trim());
   if (!session) {
     return NextResponse.json(
@@ -69,6 +78,28 @@ export async function POST(
       { status: 400 }
     );
   }
+
+  const { data: existingTurn } = await getTurnBySessionAndQuestion(
+    session.id,
+    body.questionId
+  );
+  if (existingTurn) {
+    const { data: updatedSession } = await getSessionByToken(token.trim());
+    const nextIndex = updatedSession?.currentQuestionIndex ?? session.currentQuestionIndex;
+    let questionCount = body.totalQuestions;
+    if (session.packId && questionCount <= 0) {
+      const { data: pack } = await getInterviewPackById(session.packId);
+      questionCount = pack?.questions?.length ?? 0;
+    }
+    return NextResponse.json({
+      nextIndex,
+      isComplete: nextIndex >= questionCount,
+      questionCount,
+    });
+  }
+
+  const requestId = `req-${session.id}-${body.questionId}-${Date.now()}`;
+  console.info("[session/next]", { requestId, tokenPrefix: token.slice(0, 8), questionId: body.questionId });
 
   const turnId = `turn-${session.id}-${Date.now()}`;
   const now = new Date().toISOString();
@@ -85,6 +116,7 @@ export async function POST(
     unanswered: body.unanswered,
   });
   if (!turnOk || turnError) {
+    console.error("[session/next] recordTurn failed", { requestId, error: turnError });
     return NextResponse.json(
       { error: turnError ?? "Failed to record turn." },
       { status: 500 }
@@ -93,11 +125,14 @@ export async function POST(
 
   const { ok: advanceOk, error: advanceError } = await advanceSession(token.trim());
   if (!advanceOk || advanceError) {
+    console.error("[session/next] advanceSession failed", { requestId, error: advanceError });
     return NextResponse.json(
       { error: advanceError ?? "Failed to advance session." },
       { status: 500 }
     );
   }
+
+  console.info("[session/next] success", { requestId });
 
   const { data: updatedSession } = await getSessionByToken(token.trim());
   const nextIndex = updatedSession?.currentQuestionIndex ?? session.currentQuestionIndex + 1;

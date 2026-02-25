@@ -51,6 +51,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
   const [voiceLoading, setVoiceLoading] = useState(true);
   const [liveState, setLiveState] = useState("idle");
   const [liveError, setLiveError] = useState("");
+  const [languageWarning, setLanguageWarning] = useState("");
   const [voicePaused, setVoicePaused] = useState(false);
   const [answerSaved, setAnswerSaved] = useState(false);
   const [shouldAutoStartVoice, setShouldAutoStartVoice] = useState(false);
@@ -190,10 +191,12 @@ export function InterviewSessionClient({ token, interview, questions }) {
           if (isFinal) {
             transcriptConfirmedRef.current = (confirmed ? `${confirmed} ` : "") + text.trim();
             setAnswerText(transcriptConfirmedRef.current);
+            setLanguageWarning("");
           } else {
             setAnswerText((confirmed ? `${confirmed} ` : "") + text.trim());
           }
         },
+        onLanguageWarning: (reason) => setLanguageWarning(reason),
         onError: (err) => setLiveError(err?.message ?? String(err)),
       });
       liveSessionRef.current = session;
@@ -231,6 +234,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
     cleanupLiveSession();
     setAnswerText("");
     setLiveError("");
+    setLanguageWarning("");
     startVoiceSession();
   }, [cleanupLiveSession, startVoiceSession]);
 
@@ -268,19 +272,28 @@ export function InterviewSessionClient({ token, interview, questions }) {
       if (!currentQuestion || isAdvancing) return;
       setIsAdvancing(true);
       setAnswerSaved(false);
+      setLiveError("");
+      setLanguageWarning("");
       const finalAnswer = answerText.trim() || null;
       try {
-        await fetch(`/api/interview/${token}/session/next`, {
+        const res = await fetch(`/api/interview/${token}/session/next`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             questionId: currentQuestion.id,
             questionText: currentQuestion.text,
             answer: finalAnswer,
+            transcriptChunks: finalAnswer ? [finalAnswer] : [],
             unanswered: !finalAnswer,
             totalQuestions: questionList.length,
+            idempotencyKey: `turn-${currentQuestion.id}-${currentIndex}`,
           }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setLiveError(data?.error ?? `Save failed (${res.status})`);
+          return;
+        }
         setAnswerSaved(true);
         setAnswerText("");
         transcriptConfirmedRef.current = "";
@@ -319,8 +332,11 @@ export function InterviewSessionClient({ token, interview, questions }) {
 
   const handleNext = async () => {
     const isLast = currentIndex >= questionList.length - 1;
-    if (voiceEnabled && (liveState === "listening" || liveState === "speaking")) {
-      if (!isLast && liveSessionRef.current) {
+    if (voiceEnabled && liveSessionRef.current) {
+      if (liveState === "agentSpeaking" || liveState === "userAnswering") {
+        liveSessionRef.current.submitAnswer();
+      }
+      if (!isLast) {
         clearCountdown();
         if (durationTimerRef.current) {
           clearTimeout(durationTimerRef.current);
@@ -336,7 +352,10 @@ export function InterviewSessionClient({ token, interview, questions }) {
   const handleComplete = async () => {
     if (violated || isUploading) return;
 
-    if (voiceEnabled && (liveState === "listening" || liveState === "speaking")) {
+    if (voiceEnabled && liveSessionRef.current) {
+      if (liveState === "agentSpeaking" || liveState === "userAnswering") {
+        liveSessionRef.current.submitAnswer();
+      }
       handleStopVoice();
     }
 
@@ -436,17 +455,19 @@ export function InterviewSessionClient({ token, interview, questions }) {
   const turnStatus =
     answerSaved
       ? "Saved"
-      : liveState === "connecting"
-        ? "Connecting…"
-        : liveState === "speaking"
-          ? "Agent speaking"
-          : voicePaused || liveState === "ended"
-            ? "Recording paused"
-            : liveState === "listening"
-              ? "Your turn"
-              : liveState === "error"
-                ? "Error"
-                : "Ready";
+      : liveState === "savingTurn"
+        ? "Saving…"
+        : liveState === "connecting"
+          ? "Connecting…"
+          : liveState === "agentSpeaking"
+            ? "Agent speaking"
+            : voicePaused || liveState === "ended" || liveState === "completed"
+              ? "Recording paused"
+              : liveState === "userAnswering"
+                ? "Your turn"
+                : liveState === "error"
+                  ? "Error"
+                  : "Ready";
 
   const isBusy = isUploading || isAdvancing;
 
@@ -547,9 +568,11 @@ export function InterviewSessionClient({ token, interview, questions }) {
                   placeholder={
                     liveState === "connecting"
                       ? "Connecting…"
-                      : liveState === "speaking"
+                      : liveState === "agentSpeaking"
                         ? "Agent is reading the question…"
-                        : liveState === "listening" && !voicePaused
+                        : liveState === "savingTurn"
+                          ? "Saving your answer…"
+                          : liveState === "userAnswering" && !voicePaused
                           ? "Speak now. Your words will appear here."
                           : liveState === "error"
                             ? "Something went wrong. Click Retry."
@@ -572,7 +595,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
 
             {showVoiceUI && (
               <div className="flex flex-wrap gap-2">
-                {(liveState === "idle" || liveState === "ended") && (
+                {(liveState === "idle" || liveState === "ended" || liveState === "completed") && (
                   <Button
                     onClick={startVoiceSession}
                     disabled={isBusy}
@@ -584,7 +607,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
                     Start Question
                   </Button>
                 )}
-                {(liveState === "connecting" || liveState === "listening" || liveState === "speaking") &&
+                {(liveState === "connecting" || liveState === "userAnswering" || liveState === "agentSpeaking" || liveState === "savingTurn") &&
                   !voicePaused && (
                     <>
                       <Button
@@ -609,7 +632,7 @@ export function InterviewSessionClient({ token, interview, questions }) {
                       </Button>
                     </>
                   )}
-                {(voicePaused || liveState === "ended") && liveState !== "idle" && (
+                {(voicePaused || liveState === "ended" || liveState === "completed") && liveState !== "idle" && (
                   <Button
                     onClick={handleRetryVoice}
                     disabled={isBusy}
@@ -636,6 +659,9 @@ export function InterviewSessionClient({ token, interview, questions }) {
               </div>
             )}
             {liveError && <p className="text-sm text-destructive">{liveError}</p>}
+            {languageWarning && (
+              <p className="text-sm text-amber-600 dark:text-amber-400">{languageWarning}</p>
+            )}
 
             <Separator />
             <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center">
