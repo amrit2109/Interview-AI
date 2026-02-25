@@ -7,8 +7,6 @@ import {
 import { getCandidateByInterviewToken } from "@/lib/services/candidate.service";
 import { getLiveKitConfig } from "@/lib/env";
 
-const AGENT_NAME = "interview-agent";
-
 /**
  * Mints a LiveKit room access token for the interview session.
  * Only valid interview tokens can obtain a token.
@@ -58,7 +56,7 @@ export async function POST(
     at.roomConfig = new RoomConfiguration({
       agents: [
         new RoomAgentDispatch({
-          agentName: AGENT_NAME,
+          agentName: lk.agentName,
           metadata: JSON.stringify({ interviewToken: token.trim() }),
         }),
       ],
