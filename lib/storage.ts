@@ -28,7 +28,12 @@ function getStorageConfig(): {
 } {
   const env = getEnv();
   const endpoint = env.S3_ENDPOINT;
-  const region = env.S3_REGION ?? "us-east-1";
+  // AWS SDK rejects "auto" as invalid hostname; R2 accepts us-east-1 when using custom endpoint
+  const rawRegion = (env.S3_REGION ?? "us-east-1").replace(/^['"]|['"]$/g, "").trim();
+  const region =
+    rawRegion === "auto" || !/^[a-z0-9-]+$/i.test(rawRegion)
+      ? "us-east-1"
+      : rawRegion;
   const bucket = env.S3_BUCKET;
   const accessKeyId = env.S3_ACCESS_KEY_ID;
   const secretAccessKey = env.S3_SECRET_ACCESS_KEY;
