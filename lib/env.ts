@@ -32,6 +32,7 @@ const schema = z.object({
   LIVEKIT_AGENT_NAME: z.string().optional(),
   APP_BASE_URL: z.string().optional(),
   VERCEL_URL: z.string().optional(),
+  VERCEL: z.string().optional(), // "1" when running on Vercel
   USE_LEGACY_INTERVIEW_QUESTIONS: z.string().optional(),
 });
 
