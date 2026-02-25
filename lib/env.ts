@@ -1,9 +1,11 @@
 /**
  * Centralized env validation. Validates at first use (lazy).
  * Skip strict validation when NODE_ENV === "test".
+ * Skip DATABASE_URL during Next.js build phase (Vercel build may not have it).
  */
 
 import { z } from "zod";
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -40,11 +42,12 @@ function validate(): z.infer<typeof schema> {
 
   if (parsed.success) {
     cached = parsed.data;
-    if (!isTest) {
+    const isBuildPhase = process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD;
+    if (!isTest && !isBuildPhase) {
       if (!parsed.data.DATABASE_URL) {
         throw new Error("DATABASE_URL must be set. Database operations will fail.");
       }
-      if (process.env.NODE_ENV === "production") {
+      if (process.env.NODE_ENV === "production" && !isBuildPhase) {
         if (!parsed.data.SESSION_SECRET || parsed.data.SESSION_SECRET.length < 32) {
           throw new Error("SESSION_SECRET must be set and at least 32 characters in production.");
         }
