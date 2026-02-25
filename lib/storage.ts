@@ -60,9 +60,18 @@ function getStorageConfig(): {
   return { client, bucket, region, publicBaseUrl };
 }
 
-const { client, bucket, region, publicBaseUrl } = getStorageConfig();
+/** Lazy config to avoid calling getEnv() at module load (breaks Vercel build when DATABASE_URL not set). */
+let cachedConfig: ReturnType<typeof getStorageConfig> | null = null;
+
+function getCachedStorageConfig() {
+  if (cachedConfig === null) {
+    cachedConfig = getStorageConfig();
+  }
+  return cachedConfig;
+}
 
 export function isStorageConfigured(): boolean {
+  const { client, bucket } = getCachedStorageConfig();
   return !!client && !!bucket;
 }
 
@@ -118,6 +127,7 @@ export async function uploadResumeFromServer(
   body: ArrayBuffer | Buffer | Uint8Array,
   contentType: string
 ): Promise<{ data: { objectKey: string; finalUrl: string } | null; error: string | null }> {
+  const { client, bucket, region, publicBaseUrl } = getCachedStorageConfig();
   if (!client || !bucket) {
     return {
       data: null,
@@ -158,6 +168,7 @@ export async function createPresignedUploadUrl(
   token: string,
   contentType = "video/webm"
 ): Promise<{ data: PresignedUploadResult | null; error: string | null }> {
+  const { client, bucket, region, publicBaseUrl } = getCachedStorageConfig();
   if (!client || !bucket) {
     return {
       data: null,
@@ -200,6 +211,7 @@ export async function uploadRecordingFromServer(
   body: ArrayBuffer | Buffer | Uint8Array,
   contentType = "video/webm"
 ): Promise<{ data: { objectKey: string; finalUrl: string } | null; error: string | null }> {
+  const { client, bucket, region, publicBaseUrl } = getCachedStorageConfig();
   if (!client || !bucket) {
     return {
       data: null,
@@ -232,6 +244,7 @@ export async function uploadRecordingFromServer(
 export async function verifyObjectExists(
   objectKey: string
 ): Promise<{ exists: boolean; error?: string }> {
+  const { client, bucket } = getCachedStorageConfig();
   if (!client || !bucket) {
     return { exists: false, error: "Storage not configured." };
   }

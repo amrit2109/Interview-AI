@@ -41,13 +41,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-package-lock.json
-
-yarn.lock
-node_modules
-
 FSD.md
 system-prompt.md
 .cursor
-livekit-agent/node_modules
 debug-*.log
