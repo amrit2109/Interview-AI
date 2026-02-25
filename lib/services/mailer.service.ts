@@ -191,7 +191,7 @@ async function sendViaSmtp(
 
 /**
  * Send interview invite email with link and 24-hour expiry notice.
- * Prefers Resend (HTTP) on Vercel; falls back to SMTP for local dev.
+ * On Vercel: Resend only (SMTP fails with EBUSY). Local: Resend or SMTP.
  * Returns error message on failure, null on success.
  */
 export async function sendInterviewInviteEmail(
@@ -199,12 +199,20 @@ export async function sendInterviewInviteEmail(
 ): Promise<string | null> {
   const content = buildEmailContent(candidate);
   const env = getEnv();
+  const isVercel = process.env.VERCEL === "1";
 
-  // Prefer Resend on Vercel (avoids getaddrinfo EBUSY with SMTP)
-  if (env.RESEND_API_KEY?.trim()) {
+  // On Vercel, SMTP fails with getaddrinfo EBUSY - use Resend only
+  if (isVercel) {
+    const apiKey = env.RESEND_API_KEY?.trim();
+    if (!apiKey) {
+      return "On Vercel, RESEND_API_KEY is required for email. Add it in Project Settings → Environment Variables. Get a free key at resend.com";
+    }
     return await sendViaResend(candidate, content);
   }
 
-  // Fall back to SMTP (local dev)
+  // Local: prefer Resend if configured, else SMTP
+  if (env.RESEND_API_KEY?.trim()) {
+    return await sendViaResend(candidate, content);
+  }
   return await sendViaSmtp(candidate, content);
 }
