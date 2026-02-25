@@ -20,6 +20,31 @@ const httpsAgent = new https.Agent({
   keepAlive: true,
 });
 
+/** Normalize and validate S3/R2 endpoint. Ensures valid URL for both local and production. */
+function normalizeEndpoint(
+  endpoint: string | undefined,
+  bucket: string | undefined
+): string | undefined {
+  if (!endpoint || typeof endpoint !== "string") return undefined;
+  let u = endpoint.replace(/^['"]|['"]$/g, "").trim().replace(/\/$/, "");
+  if (!u) return undefined;
+  // Strip bucket from path if present (e.g. .../orion-talentiq)
+  if (bucket && u.endsWith("/" + bucket)) {
+    u = u.slice(0, -(bucket.length + 1));
+  }
+  if (!u) return undefined;
+  // Ensure protocol for production envs (Vercel may have hostname-only values)
+  if (!u.startsWith("http://") && !u.startsWith("https://")) {
+    u = "https://" + u;
+  }
+  try {
+    new URL(u);
+    return u;
+  } catch {
+    return undefined;
+  }
+}
+
 function getStorageConfig(): {
   client: S3Client | null;
   bucket: string | undefined;
@@ -27,35 +52,30 @@ function getStorageConfig(): {
   publicBaseUrl: string | undefined;
 } {
   const env = getEnv();
-  const endpoint = env.S3_ENDPOINT;
+  const bucket = (env.S3_BUCKET ?? "").replace(/^['"]|['"]$/g, "").trim();
+  const accessKeyId = (env.S3_ACCESS_KEY_ID ?? "").replace(/^['"]|['"]$/g, "").trim();
+  const secretAccessKey = (env.S3_SECRET_ACCESS_KEY ?? "").replace(/^['"]|['"]$/g, "").trim();
+  const publicBaseUrl = (env.S3_PUBLIC_BASE_URL ?? "").replace(/^['"]|['"]$/g, "").trim() || undefined;
+
   // AWS SDK rejects "auto" as invalid hostname; R2 accepts us-east-1 when using custom endpoint
   const rawRegion = (env.S3_REGION ?? "us-east-1").replace(/^['"]|['"]$/g, "").trim();
   const region =
     rawRegion === "auto" || !/^[a-z0-9-]+$/i.test(rawRegion)
       ? "us-east-1"
       : rawRegion;
-  const bucket = env.S3_BUCKET;
-  const accessKeyId = env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = env.S3_SECRET_ACCESS_KEY;
-  const publicBaseUrl = env.S3_PUBLIC_BASE_URL;
 
   if (!bucket || !accessKeyId || !secretAccessKey) {
     return { client: null, bucket: undefined, region, publicBaseUrl };
   }
-  const normalizedEndpoint = endpoint
-    ? (() => {
-        let u = endpoint.replace(/\/$/, "");
-        if (bucket && u.endsWith("/" + bucket)) {
-          u = u.slice(0, -(bucket.length + 1));
-        }
-        return u || undefined;
-      })()
-    : undefined;
+
+  const normalizedEndpoint = normalizeEndpoint(env.S3_ENDPOINT, bucket);
+
   const client = new S3Client({
     region,
     ...(normalizedEndpoint && { endpoint: normalizedEndpoint }),
     credentials: { accessKeyId, secretAccessKey },
-    ...(normalizedEndpoint?.startsWith("https://") && { forcePathStyle: false }),
+    // R2 requires path-style URLs; virtual-hosted style can cause "Invalid URL" on production
+    ...(normalizedEndpoint && { forcePathStyle: true }),
     requestHandler: new NodeHttpHandler({
       httpsAgent,
       connectionTimeout: 10_000,

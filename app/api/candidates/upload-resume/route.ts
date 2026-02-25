@@ -50,10 +50,11 @@ export async function POST(request: NextRequest) {
     const { data, error } = await uploadResumeFromServer(email, buffer, contentType);
 
     if (error || !data) {
-      return NextResponse.json(
-        { error: error ?? "Failed to upload resume." },
-        { status: 502 }
-      );
+      const errMsg =
+        error?.toLowerCase().includes("invalid url")
+          ? "Storage configuration error. Ensure S3_ENDPOINT and other S3_* env vars are set correctly in production (e.g. Vercel)."
+          : (error ?? "Failed to upload resume.");
+      return NextResponse.json({ error: errMsg }, { status: 502 });
     }
 
     return NextResponse.json({ resumeLink: data.finalUrl });
