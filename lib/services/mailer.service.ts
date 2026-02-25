@@ -129,7 +129,8 @@ async function sendViaResend(
   const apiKey = env.RESEND_API_KEY?.trim();
   if (!apiKey) return null;
 
-  const fromRaw = env.RESEND_FROM?.trim() ?? env.EMAIL_FROM?.trim();
+  // Resend requires verified domain; Gmail/EMAIL_FROM is invalid. Use onboarding@resend.dev unless RESEND_FROM is set.
+  const fromRaw = env.RESEND_FROM?.trim();
   const from = fromRaw?.includes("<")
     ? fromRaw
     : fromRaw
