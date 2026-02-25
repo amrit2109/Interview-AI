@@ -27,6 +27,7 @@ const schema = z.object({
   LIVEKIT_URL: z.string().optional(),
   LIVEKIT_API_KEY: z.string().optional(),
   LIVEKIT_API_SECRET: z.string().optional(),
+  LIVEKIT_AGENT_NAME: z.string().optional(),
   APP_BASE_URL: z.string().optional(),
   VERCEL_URL: z.string().optional(),
   USE_LEGACY_INTERVIEW_QUESTIONS: z.string().optional(),
@@ -69,16 +70,19 @@ export function getLiveKitConfig(): {
   url: string;
   apiKey: string;
   apiSecret: string;
+  agentName: string;
 } | null {
   const env = getEnv();
   const url = env.LIVEKIT_URL?.trim();
   const apiKey = env.LIVEKIT_API_KEY?.trim();
   const apiSecret = env.LIVEKIT_API_SECRET?.trim();
   if (!url || !apiKey || !apiSecret) return null;
+  const agentName = env.LIVEKIT_AGENT_NAME?.trim() || "interview-agent";
   return {
     enabled: true,
     url,
     apiKey,
     apiSecret,
+    agentName,
   };
 }
