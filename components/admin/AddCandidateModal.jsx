@@ -210,12 +210,17 @@ export function AddCandidateModal({ open, onOpenChange, onSuccess }) {
       const json = await res.json();
       const apiError = json?.error;
       const data = json?.data;
+      const emailError = json?.emailError;
       if (!res.ok && res.status !== 207) {
         setError(apiError ?? "Failed to send interview link.");
         return;
       }
       if (apiError && !data) {
         setError(apiError);
+        return;
+      }
+      if (res.status === 207 && apiError) {
+        setError(emailError ? `${apiError} (${emailError})` : apiError);
         return;
       }
       handleOpenChange(false);
