@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import { Resend } from "resend";
 import type { CandidateWithToken } from "./candidate.service";
 import { getEnv } from "@/lib/env";
 
@@ -31,6 +30,9 @@ function createTransporter(): nodemailer.Transporter | null {
   const secure = env.SMTP_SECURE === "true";
 
   if (!host || !user || !pass) {
+    console.error(
+      "Mailer: SMTP not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env"
+    );
     return null;
   }
 
@@ -43,11 +45,23 @@ function createTransporter(): nodemailer.Transporter | null {
   });
 }
 
-function buildEmailContent(candidate: CandidateWithToken): {
-  html: string;
-  text: string;
-  subject: string;
-} {
+/**
+ * Send interview invite email with link and 24-hour expiry notice.
+ * Returns error message on failure, null on success.
+ */
+export async function sendInterviewInviteEmail(
+  candidate: CandidateWithToken
+): Promise<string | null> {
+  const transporter = createTransporter();
+  if (!transporter) {
+    return "Email service is not configured.";
+  }
+
+  const env = getEnv();
+  const from = env.EMAIL_FROM ?? env.SMTP_USER;
+  if (!from) {
+    return "Email configuration error: EMAIL_FROM or SMTP_USER must be set.";
+  }
   const baseUrl = getBaseUrl();
   const interviewUrl = `${baseUrl}/interview/${candidate.token}`;
   const safeName = escapeHtml(candidate.name);
@@ -110,110 +124,18 @@ If you did not expect this invitation, you can safely ignore this email.
 Orion TalentIQ
 `;
 
-  return {
-    html,
-    text,
-    subject: "Your Interview Invitation – Orion TalentIQ",
-  };
-}
-
-/**
- * Send via Resend (HTTP API) - reliable on Vercel serverless.
- * Uses onboarding@resend.dev for testing; set RESEND_FROM for verified domain.
- */
-async function sendViaResend(
-  candidate: CandidateWithToken,
-  content: { html: string; text: string; subject: string }
-): Promise<string | null> {
-  const env = getEnv();
-  const apiKey = env.RESEND_API_KEY?.trim();
-  if (!apiKey) return null;
-
-  // Resend requires verified domain; Gmail/EMAIL_FROM is invalid. Use onboarding@resend.dev unless RESEND_FROM is set.
-  const fromRaw = env.RESEND_FROM?.trim();
-  const from = fromRaw?.includes("<")
-    ? fromRaw
-    : fromRaw
-      ? `Orion TalentIQ <${fromRaw}>`
-      : "Orion TalentIQ <onboarding@resend.dev>";
-
-  try {
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from,
-      to: candidate.email,
-      subject: content.subject,
-      html: content.html,
-      text: content.text,
-    });
-    if (error) {
-      console.error("sendInterviewInviteEmail (Resend):", error);
-      return error.message ?? JSON.stringify(error);
-    }
-    return null;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("sendInterviewInviteEmail (Resend):", err);
-    return msg;
-  }
-}
-
-/**
- * Send via SMTP (nodemailer) - works locally; can fail on Vercel with EBUSY.
- */
-async function sendViaSmtp(
-  candidate: CandidateWithToken,
-  content: { html: string; text: string; subject: string }
-): Promise<string | null> {
-  const transporter = createTransporter();
-  if (!transporter) {
-    return "Email service is not configured. Set RESEND_API_KEY (recommended for Vercel) or SMTP_HOST, SMTP_USER, SMTP_PASS.";
-  }
-
-  const env = getEnv();
-  const from = env.EMAIL_FROM ?? env.SMTP_USER;
-  if (!from) return "Email configuration error: EMAIL_FROM or SMTP_USER must be set.";
-
   try {
     await transporter.sendMail({
       from,
       to: candidate.email,
-      subject: content.subject,
-      text: content.text,
-      html: content.html,
+      subject: "Your Interview Invitation – Orion TalentIQ",
+      text,
+      html,
     });
     return null;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("sendInterviewInviteEmail (SMTP):", err);
+    console.error("sendInterviewInviteEmail:", err);
     return msg;
   }
-}
-
-/**
- * Send interview invite email with link and 24-hour expiry notice.
- * On Vercel: Resend only (SMTP fails with EBUSY). Local: Resend or SMTP.
- * Returns error message on failure, null on success.
- */
-export async function sendInterviewInviteEmail(
-  candidate: CandidateWithToken
-): Promise<string | null> {
-  const content = buildEmailContent(candidate);
-  const env = getEnv();
-  const isVercel = process.env.VERCEL === "1";
-
-  // On Vercel, SMTP fails with getaddrinfo EBUSY - use Resend only
-  if (isVercel) {
-    const apiKey = env.RESEND_API_KEY?.trim();
-    if (!apiKey) {
-      return "On Vercel, RESEND_API_KEY is required for email. Add it in Project Settings → Environment Variables. Get a free key at resend.com";
-    }
-    return await sendViaResend(candidate, content);
-  }
-
-  // Local: prefer Resend if configured, else SMTP
-  if (env.RESEND_API_KEY?.trim()) {
-    return await sendViaResend(candidate, content);
-  }
-  return await sendViaSmtp(candidate, content);
 }
