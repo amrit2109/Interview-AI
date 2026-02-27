@@ -15,8 +15,6 @@ export interface SendInterviewInvitePayload extends CreateCandidateWithInvitePay
 export interface SendInterviewInviteResult {
   data: CandidateWithToken | null;
   error: string | null;
-  /** Raw email error when status is 207 (for debugging) */
-  emailError?: string | null;
 }
 
 /**
@@ -104,7 +102,6 @@ export async function sendInterviewInvite(
     return {
       data: candidate,
       error: "Candidate created but email could not be sent. Please contact the candidate directly.",
-      emailError,
     };
   }
 

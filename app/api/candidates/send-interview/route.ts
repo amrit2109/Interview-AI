@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error, emailError } = await sendInterviewInvite(payload);
+    const { data, error } = await sendInterviewInvite(payload);
 
     if (error && !data) {
       const status = error.includes("required") ? 400 : 500;
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (error && data) {
       return NextResponse.json(
-        { data, error, emailError: emailError ?? undefined },
+        { data, error },
         { status: 207 }
       );
     }
